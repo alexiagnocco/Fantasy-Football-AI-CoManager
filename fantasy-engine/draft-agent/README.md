@@ -48,7 +48,23 @@ npm test            # unit tests for pick math + strategy engine
 
 `ESPN_S2`/`ESPN_SWID` are required for private leagues (grab them from a logged-in browser: DevTools → Application → Cookies → fantasy.espn.com). `LEAGUE_1_ID` / `LEAGUE_1_TEAM_ID` are also accepted, matching the rest of this repo.
 
-## Using it during a live draft
+## In-person drafts: offline mode + web draft board
+
+If your league drafts in person (ESPN updated later), use manual mode. One bulk load before draft day, then everything runs offline:
+
+```bash
+# At home, with network + ESPN cookies in the environment:
+npm run snapshot        # saves player pool + league config to data/snapshot.json
+
+# On draft day (no network needed):
+npm run web             # opens the draft board at http://localhost:3210
+```
+
+The web UI walks you through setup (teams, rounds, your slot), then you click **Drafted** as each pick is announced in the room — snake math attributes every pick to the right team automatically, so your roster builds itself. The **Optimal pick** panel re-scores the board after every pick with the same engine the MCP tools use.
+
+State lives in `data/draft-state.json`, so the MCP server and the web UI stay in sync: while a manual session is active, all four MCP tools automatically use it instead of the ESPN live feed. That means you can click picks in the browser and simultaneously ask Claude Desktop "who should I take and why?" for a deeper discussion. Undo and session reset are in the UI header; a browser or laptop restart loses nothing.
+
+## Using it during a live online draft
 
 1. Before the draft: *"Give me the strategy guide for my league."*
 2. When the draft opens: *"What's the draft state?"*

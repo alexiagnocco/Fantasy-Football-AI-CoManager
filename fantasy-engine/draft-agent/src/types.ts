@@ -57,6 +57,21 @@ export interface RankedPlayer extends PlayerInfo {
   tier: number;
 }
 
+/** Everything the tools need for one decision, from ESPN live or manual mode. */
+export interface DraftContext {
+  state: DraftState;
+  pool: PlayerInfo[];
+  ranked: RankedPlayer[];
+  available: RankedPlayer[];
+  myPlayers: PlayerInfo[];
+  myPicks: number[];
+  myNextPick: number | null;
+  myFollowingPick: number | null;
+  /** Team id to score for (ESPN team id, or slot number in manual mode). */
+  myTeamId: number;
+  manualMode: boolean;
+}
+
 export interface RosterNeeds {
   /** Starter slots still unfilled, e.g. { RB: 1, TE: 1, FLEX: 1, K: 1 } */
   openStarterSlots: Record<string, number>;

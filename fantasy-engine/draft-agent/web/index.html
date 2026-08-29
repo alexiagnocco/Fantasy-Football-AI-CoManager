@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏈</text></svg>">
+<title>Draft Board</title>
+<style>
+  :root {
+    --bg: #0f1419; --panel: #1a2129; --panel2: #212a34; --line: #2e3a46;
+    --text: #e6edf3; --dim: #8b98a5; --accent: #4dabf7; --me: #37b24d;
+    --qb: #e64980; --rb: #37b24d; --wr: #4dabf7; --te: #f59f00; --k: #9775fa;
+    --warn: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { display: flex; gap: 18px; align-items: center; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; flex-wrap: wrap; }
+  header .big { font-size: 18px; font-weight: 700; }
+  header .dim { color: var(--dim); }
+  .my-turn { background: var(--me); color: #04110a; font-weight: 800; padding: 3px 10px; border-radius: 6px; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { opacity: .55; } }
+  main { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 12px; padding: 12px 16px; align-items: start; }
+  @media (max-width: 1100px) { main { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  section h2 { margin: 0; padding: 10px 12px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); border-bottom: 1px solid var(--line); }
+  .controls { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .controls input[type=search] { flex: 1; min-width: 140px; background: var(--panel2); border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 6px 9px; }
+  .tab { background: var(--panel2); border: 1px solid var(--line); color: var(--dim); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+  .tab.on { color: var(--text); border-color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--dim); font-size: 11px; text-transform: uppercase; position: sticky; }
+  .scroll { max-height: 62vh; overflow-y: auto; }
+  .pos { font-weight: 700; padding: 1px 6px; border-radius: 4px; font-size: 11px; color: #0b0f14; }
+  .pos.QB { background: var(--qb); } .pos.RB { background: var(--rb); } .pos.WR { background: var(--wr); }
+  .pos.TE { background: var(--te); } .pos.K { background: var(--k); } .pos.DST { background: var(--dim); }
+  button.draft { background: var(--accent); border: 0; color: #04121f; font-weight: 700; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  button.draft:hover { filter: brightness(1.15); }
+  .ghost { background: none; border: 1px solid var(--line); color: var(--dim); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+  .ghost:hover { color: var(--text); }
+  .rec-card { margin: 10px 12px; padding: 10px 12px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; }
+  .rec-card.top { border-color: var(--me); }
+  .rec-card .name { font-weight: 700; font-size: 15px; }
+  .rec-card .meta { color: var(--dim); font-size: 12px; margin: 2px 0 4px; }
+  .rec-card .why { font-size: 12px; }
+  .strategy { margin: 10px 12px; padding: 9px 11px; border-left: 3px solid var(--accent); background: var(--panel2); border-radius: 0 8px 8px 0; font-size: 13px; }
+  .gone { color: var(--warn); font-size: 12px; margin: 8px 12px 12px; }
+  ul.plain { list-style: none; margin: 0; padding: 6px 12px 12px; }
+  ul.plain li { padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  ul.plain li:last-child { border: 0; }
+  .risk-likely-gone { color: var(--warn); } .risk-at-risk { color: var(--te); } .risk-safe { color: var(--dim); }
+  #setup, #fatal { max-width: 460px; margin: 12vh auto; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
+  #setup label { display: block; margin: 12px 0 4px; color: var(--dim); }
+  #setup input { width: 100%; background: var(--panel2); border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 8px 10px; font-size: 15px; }
+  #setup button { margin-top: 18px; width: 100%; background: var(--me); color: #04110a; font-weight: 800; border: 0; border-radius: 8px; padding: 11px; font-size: 15px; cursor: pointer; }
+  .hidden { display: none !important; }
+  .slots { color: var(--dim); font-size: 12px; }
+  .slots b { color: var(--warn); }
+</style>
+</head>
+<body>
+
+<div id="fatal" class="hidden"></div>
+
+<div id="setup" class="hidden">
+  <h1 style="margin-top:0">Draft setup</h1>
+  <p class="dim" id="setup-league"></p>
+  <label>Number of teams</label><input id="su-teams" type="number" min="2" max="20" value="11">
+  <label>Total rounds</label><input id="su-rounds" type="number" min="1" max="30" value="15">
+  <label>Your draft slot (round-1 position)</label><input id="su-slot" type="number" min="1" value="1">
+  <button id="su-go">Start draft</button>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <span class="big" id="h-pick"></span>
+    <span id="h-clock"></span>
+    <span class="dim" id="h-next"></span>
+    <span class="dim" id="h-league"></span>
+    <span style="flex:1"></span>
+    <button class="ghost" id="btn-undo">Undo last pick</button>
+    <button class="ghost" id="btn-reset">End session</button>
+  </header>
+  <main>
+    <section>
+      <h2>Available players</h2>
+      <div class="controls">
+        <input type="search" id="search" placeholder="Search player or NFL team…">
+        <span id="tabs"></span>
+      </div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th></th><th>Player</th><th>Bye</th><th>Proj</th><th>VORP</th><th>Tier</th><th>ADP</th><th>Next pick</th><th></th></tr></thead>
+          <tbody id="players"></tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Optimal pick</h2>
+      <div class="strategy" id="strategy"></div>
+      <div class="slots" style="margin:0 12px" id="slots"></div>
+      <div id="recs"></div>
+      <div class="gone" id="gone"></div>
+    </section>
+    <section>
+      <h2>My roster</h2>
+      <ul class="plain" id="roster"></ul>
+      <h2>Pick ticker</h2>
+      <ul class="plain" id="ticker"></ul>
+    </section>
+  </main>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let board = null;
+let posFilter = "ALL";
+const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K"];
+
+async function api(path, body) {
+  const res = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : undefined);
+  const data = await res.json();
+  if (data.error && !res.ok) { alert(data.error); return null; }
+  return data;
+}
+
+function show(view) {
+  for (const id of ["fatal", "setup", "app"]) $(id).classList.toggle("hidden", id !== view);
+}
+
+function posBadge(p) { return `<span class="pos ${p}">${p}</span>`; }
+
+function render() {
+  if (!board) return;
+  if (board.error) { $("fatal").innerHTML = `<h1>Not ready</h1><p>${board.error}</p>`; show("fatal"); return; }
+  if (board.needsSetup) {
+    $("setup-league").textContent =
+      `${board.config.scoringLabel} · snapshot from ${new Date(board.snapshotCreatedAt).toLocaleString()}`;
+    $("su-teams").value = board.config.teamCount || 11;
+    $("su-rounds").value = board.totalRounds || 15;
+    $("su-slot").max = board.config.teamCount || 20;
+    show("setup"); return;
+  }
+  show("app");
+  const s = board.state;
+
+  $("h-pick").textContent = s.completed
+    ? "Draft complete 🎉"
+    : `Pick ${s.currentOverallPick}/${s.totalPicks} · Round ${s.currentRound}`;
+  $("h-clock").innerHTML = s.completed ? "" : s.myTurn
+    ? `<span class="my-turn">YOU'RE ON THE CLOCK</span>`
+    : `On the clock: <b>${s.onTheClockName}</b>`;
+  $("h-next").textContent = s.myUpcomingPicks.length ? `Your picks: ${s.myUpcomingPicks.join(", ")}` : "";
+  $("h-league").textContent = `${board.config.scoringLabel} · ${board.config.teamCount} teams`;
+
+  // tabs
+  $("tabs").innerHTML = POSITIONS.map(p =>
+    `<button class="tab ${p === posFilter ? "on" : ""}" data-pos="${p}">${p}</button>`).join("");
+
+  // players
+  const q = $("search").value.trim().toLowerCase();
+  const rows = board.available
+    .filter(p => posFilter === "ALL" || p.position === posFilter)
+    .filter(p => !q || p.name.toLowerCase().includes(q) || p.proTeam.toLowerCase().includes(q))
+    .slice(0, 60)
+    .map(p => `<tr>
+      <td>${posBadge(p.position)}<span class="dim" style="font-size:11px">${p.positionalRank}</span></td>
+      <td><b>${p.name}</b> <span class="dim">${p.proTeam}</span>${p.injuryStatus ? ` <span class="risk-likely-gone">⚠${p.injuryStatus}</span>` : ""}</td>
+      <td>${p.byeWeek ?? "?"}</td><td>${p.projectedPoints}</td><td>${p.vorp}</td><td>${p.tier}</td><td>${p.adp}</td>
+      <td class="risk-${p.availability.replace(" ", "-")}">${p.availability}</td>
+      <td><button class="draft" data-id="${p.id}">Drafted</button></td>
+    </tr>`);
+  $("players").innerHTML = rows.join("") || `<tr><td colspan="9" class="dim">No matches</td></tr>`;
+
+  // recommendation panel
+  const rec = board.recommendation;
+  if (rec) {
+    $("strategy").textContent = rec.roundStrategy;
+    const open = Object.entries(rec.openStarterSlots).map(([k, v]) => `${k}×${v}`).join(", ");
+    $("slots").innerHTML = `Open starters: <b>${open || "all filled"}</b> · bench left: ${rec.benchSpotsLeft} · planning to pick #${rec.planningPick ?? "—"}`;
+    $("recs").innerHTML = rec.candidates.slice(0, 5).map((c, i) => `
+      <div class="rec-card ${i === 0 ? "top" : ""}">
+        <div class="name">${i + 1}. ${c.name} ${posBadge(c.position)} <span class="dim">${c.proTeam}</span>
+          <span style="float:right">${c.score}</span></div>
+        <div class="meta">proj ${c.projectedPoints} · VORP ${c.vorp} · tier ${c.tier} · ADP ${c.adp} · bye ${c.byeWeek ?? "?"} · <span class="risk-${c.availabilityAtNextPick.replace(" ", "-")}">${c.availabilityAtNextPick}</span></div>
+        <div class="why">${c.reasons.map(r => `• ${r}`).join("<br>")}</div>
+        <div style="margin-top:6px"><button class="draft" data-id="${c.id}">Draft ${c.name.split(" ").slice(-1)}</button></div>
+      </div>`).join("");
+    $("gone").innerHTML = rec.likelyGoneByNextPick.length
+      ? `Likely gone by #${rec.planningPick ?? "—"}: ` + rec.likelyGoneByNextPick.map(p => `${p.name} (${p.position})`).join(", ")
+      : "";
+  } else {
+    $("strategy").textContent = "Draft complete."; $("recs").innerHTML = ""; $("gone").innerHTML = ""; $("slots").innerHTML = "";
+  }
+
+  // roster + ticker
+  $("roster").innerHTML = board.myRoster.map(p =>
+    `<li>${posBadge(p.position)} <b>${p.name}</b> <span class="dim">${p.proTeam} · bye ${p.byeWeek ?? "?"} · proj ${p.projectedPoints}</span></li>`).join("")
+    || `<li class="dim">No picks yet</li>`;
+  $("ticker").innerHTML = board.recentPicks.map(p =>
+    `<li><span class="dim">#${p.overallPick} R${p.round}</span> ${p.teamName.startsWith("You") ? "🟢" : ""} <b>${p.teamName}</b>: ${p.playerName} ${p.position ? posBadge(p.position) : ""}</li>`).join("")
+    || `<li class="dim">Draft hasn't started</li>`;
+}
+
+async function refresh() { board = await api("/api/board"); render(); }
+
+document.addEventListener("click", async (e) => {
+  const t = e.target;
+  if (t.matches(".tab")) { posFilter = t.dataset.pos; render(); }
+  if (t.matches("button.draft")) {
+    t.disabled = true;
+    board = await api("/api/pick", { playerId: Number(t.dataset.id) }) || board;
+    render();
+  }
+  if (t.id === "btn-undo") { board = await api("/api/undo", {}) || board; render(); }
+  if (t.id === "btn-reset" && confirm("End this draft session? The board will reset to setup.")) {
+    board = await api("/api/reset", {}) || board; render();
+  }
+  if (t.id === "su-go") {
+    board = await api("/api/setup", {
+      teamCount: Number($("su-teams").value),
+      totalRounds: Number($("su-rounds").value),
+      mySlot: Number($("su-slot").value),
+    }) || board;
+    render();
+  }
+});
+$("search").addEventListener("input", render);
+
+refresh();
+</script>
+</body>
+</html>

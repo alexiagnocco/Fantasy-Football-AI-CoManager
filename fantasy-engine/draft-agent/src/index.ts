@@ -24,7 +24,10 @@ import {
   strategyGuide,
   availabilityAtPick,
 } from "./lib/strategy.js";
-import { DraftState, PlayerInfo, RankedPlayer } from "./types.js";
+import { buildRecommendation } from "./lib/recommend.js";
+import { loadManualState, loadSnapshot } from "./manualSession.js";
+import { buildManualDraftContext } from "./manualContext.js";
+import { DraftContext, PlayerInfo, RankedPlayer } from "./types.js";
 
 const server = new McpServer({
   name: "espn-draft-mcp-server",
@@ -51,19 +54,24 @@ function resolveTeamId(arg?: number): number {
   return id;
 }
 
-interface DraftContext {
-  state: DraftState;
-  pool: PlayerInfo[];
-  ranked: RankedPlayer[];
-  available: RankedPlayer[];
-  myPlayers: PlayerInfo[];
-  myPicks: number[];
-  myNextPick: number | null;
-  myFollowingPick: number | null;
-}
-
-/** One fetch pass shared by every tool: live state + pool, names resolved. */
-async function loadContext(leagueId: string, teamId: number): Promise<DraftContext> {
+/**
+ * One pass shared by every tool. If a manual (in-person) draft session is
+ * active on disk, it takes precedence over the ESPN live feed - see
+ * manualSession.ts and the web UI (npm run web).
+ */
+async function loadContext(leagueIdArg?: string, teamIdArg?: number): Promise<DraftContext> {
+  const manual = loadManualState();
+  if (manual) {
+    const snapshot = loadSnapshot();
+    if (!snapshot) {
+      throw new Error(
+        "A manual draft session is active but no snapshot exists. Run `npm run snapshot` in draft-agent first (needs network + ESPN cookies)."
+      );
+    }
+    return buildManualDraftContext(snapshot, manual);
+  }
+  const leagueId = resolveLeagueId(leagueIdArg);
+  const teamId = resolveTeamId(teamIdArg);
   const [{ state }, pool] = await Promise.all([
     espnClient.getDraftState(leagueId),
     espnClient.getPlayerPool(leagueId),
@@ -103,6 +111,8 @@ async function loadContext(leagueId: string, teamId: number): Promise<DraftConte
     myPicks,
     myNextPick: nextPickAtOrAfter(myPicks, state.currentOverallPick),
     myFollowingPick: followingPick(myPicks, state.currentOverallPick),
+    myTeamId: teamId,
+    manualMode: false,
   };
 }
 
@@ -131,10 +141,9 @@ Returns markdown plus structuredContent with: config, currentOverallPick, curren
   },
   async (args) => {
     try {
-      const leagueId = resolveLeagueId(args.leagueId);
-      const teamId = resolveTeamId(args.teamId);
-      const ctx = await loadContext(leagueId, teamId);
+      const ctx = await loadContext(args.leagueId, args.teamId);
       const { state } = ctx;
+      const teamId = ctx.myTeamId;
       const needs = computeRosterNeeds(ctx.myPlayers, state.config);
 
       const recent = state.picks.slice(-10);
@@ -147,7 +156,7 @@ Returns markdown plus structuredContent with: config, currentOverallPick, curren
           : "NOT STARTED";
 
       const lines = [
-        `# Draft State - ${state.config.scoringLabel}, ${state.config.teamCount} teams (${state.draftType})`,
+        `# Draft State - ${state.config.scoringLabel}, ${state.config.teamCount} teams (${state.draftType}${ctx.manualMode ? ", MANUAL in-person mode" : ""})`,
         `**Status**: ${status} | **Pick**: ${state.currentOverallPick}/${state.totalPicks} (round ${state.currentRound}/${state.totalRounds})`,
         state.onTheClockTeamName ? `**On the clock**: ${state.onTheClockTeamName}${state.onTheClockTeamId === teamId ? " ← **THAT'S YOU**" : ""}` : "",
         `**Your upcoming picks**: ${upcoming.join(", ") || "none left"}`,
@@ -203,9 +212,7 @@ Use during a draft to see the board; use draft_recommend_pick for an actual scor
   },
   async (args) => {
     try {
-      const leagueId = resolveLeagueId(args.leagueId);
-      const teamId = resolveTeamId(args.teamId);
-      const ctx = await loadContext(leagueId, teamId);
+      const ctx = await loadContext(args.leagueId, args.teamId);
       let list = ctx.available;
       if (args.position) list = list.filter((p) => p.position === args.position);
       list = list.slice(0, args.limit ?? 15);
@@ -245,74 +252,33 @@ Also reports which of the top candidates will likely be gone by your next pick, 
   },
   async (args) => {
     try {
-      const leagueId = resolveLeagueId(args.leagueId);
-      const teamId = resolveTeamId(args.teamId);
-      const ctx = await loadContext(leagueId, teamId);
+      const ctx = await loadContext(args.leagueId, args.teamId);
       const { state } = ctx;
 
       if (state.completed) {
         return { content: [{ type: "text", text: "Draft is already completed - nothing to recommend." }] };
       }
 
-      const needs = computeRosterNeeds(ctx.myPlayers, state.config);
-      // Plan against the pick after the one on the clock: if it's my turn now,
-      // scarcity is measured to my NEXT turn.
-      const planningPick =
-        ctx.myNextPick === state.currentOverallPick ? ctx.myFollowingPick : ctx.myNextPick;
-      const scored = scoreCandidates(
-        ctx.available,
-        needs,
-        state.config,
-        state.currentOverallPick,
-        planningPick,
-        state.currentRound,
-        state.totalRounds
-      );
-
-      const top = scored.slice(0, args.limit ?? 8);
-      const advice = roundAdvice(state.currentRound, state.totalRounds, needs, state.config);
-      const goneByNext = scored
-        .slice(0, 25)
-        .filter((c) => c.availabilityAtNextPick === "likely gone")
-        .slice(0, 8);
-
-      const yourTurn = state.onTheClockTeamId === teamId;
+      const rec = buildRecommendation(ctx, args.limit ?? 8);
       const lines = [
-        `# Pick recommendation - overall #${state.currentOverallPick}, round ${state.currentRound}${yourTurn ? " (YOU ARE ON THE CLOCK)" : ""}`,
-        `**Round strategy**: ${advice}`,
-        `**Open starters**: ${Object.entries(needs.openStarterSlots).map(([s, n]) => `${s}×${n}`).join(", ") || "all filled"} | your next pick after this turn: ${planningPick ?? "none"}`,
+        `# Pick recommendation - overall #${rec.currentOverallPick}, round ${rec.round}${rec.onTheClock ? " (YOU ARE ON THE CLOCK)" : ""}${ctx.manualMode ? " [manual mode]" : ""}`,
+        `**Round strategy**: ${rec.roundStrategy}`,
+        `**Open starters**: ${Object.entries(rec.openStarterSlots).map(([s, n]) => `${s}×${n}`).join(", ") || "all filled"} | your next pick after this turn: ${rec.planningPick ?? "none"}`,
         "",
         "## Top candidates",
-        ...top.map(
+        ...rec.candidates.map(
           (c, i) =>
-            `${i + 1}. **${c.player.name}** (${c.player.position}${c.player.positionalRank} ${c.player.proTeam}, bye ${c.player.byeWeek ?? "?"}) - score ${c.score}\n   proj ${c.player.projectedPoints} | VORP ${c.player.vorp} | tier ${c.player.tier} | ADP ${c.player.adp} | ${c.availabilityAtNextPick} at your next pick\n   ${c.reasons.map((r) => `• ${r}`).join(" ")}`
+            `${i + 1}. **${c.name}** (${c.position}${c.positionalRank} ${c.proTeam}, bye ${c.byeWeek ?? "?"}) - score ${c.score}\n   proj ${c.projectedPoints} | VORP ${c.vorp} | tier ${c.tier} | ADP ${c.adp} | ${c.availabilityAtNextPick} at your next pick\n   ${c.reasons.map((r) => `• ${r}`).join(" ")}`
         ),
         "",
-        goneByNext.length
-          ? `## Likely gone before your next pick (#${planningPick ?? "-"})\n${goneByNext.map((c) => `- ${c.player.name} (${c.player.position}, ADP ${c.player.adp})`).join("\n")}`
+        rec.likelyGoneByNextPick.length
+          ? `## Likely gone before your next pick (#${rec.planningPick ?? "-"})\n${rec.likelyGoneByNextPick.map((p) => `- ${p.name} (${p.position}, ADP ${p.adp})`).join("\n")}`
           : "",
       ].filter(Boolean);
 
-      const output = {
-        onTheClock: yourTurn,
-        currentOverallPick: state.currentOverallPick,
-        round: state.currentRound,
-        roundStrategy: advice,
-        openStarterSlots: needs.openStarterSlots,
-        recommendation: top[0]
-          ? { name: top[0].player.name, position: top[0].player.position, score: top[0].score, reasons: top[0].reasons }
-          : null,
-        candidates: top.map((c) => ({
-          ...c.player,
-          score: c.score,
-          availabilityAtNextPick: c.availabilityAtNextPick,
-          reasons: c.reasons,
-        })),
-        likelyGoneByNextPick: goneByNext.map((c) => c.player.name),
-      };
       return {
         content: [{ type: "text", text: lines.join("\n") }],
-        structuredContent: output as Record<string, unknown>,
+        structuredContent: rec as unknown as Record<string, unknown>,
       };
     } catch (e) {
       return { content: [{ type: "text", text: describeEspnError(e) }], isError: true };
@@ -333,6 +299,13 @@ Call once before the draft to brief the user; the per-round advice also appears 
   },
   async (args) => {
     try {
+      const manual = loadManualState();
+      const snapshot = manual ? loadSnapshot() : null;
+      if (manual && snapshot) {
+        return {
+          content: [{ type: "text", text: strategyGuide({ ...snapshot.config, teamCount: manual.teamCount }, manual.totalRounds) }],
+        };
+      }
       const leagueId = resolveLeagueId(args.leagueId);
       const { state } = await espnClient.getDraftState(leagueId);
       const text = strategyGuide(state.config, state.totalRounds);
