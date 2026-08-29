@@ -1,0 +1,30 @@
+{
+  "name": "espn-draft-mcp-server",
+  "version": "1.0.0",
+  "description": "Interactive ESPN Fantasy Football draft agent (MCP server) - live draft state, best-available rankings, and pick recommendations",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "espn-draft-mcp-server": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "clean": "rm -rf dist"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.4",
+    "axios": "^1.7.9",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

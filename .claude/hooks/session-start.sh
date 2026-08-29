@@ -29,6 +29,11 @@ echo "[session-start] Building automation..."
 # which we've already installed and built above.
 npx tsc
 
+echo "[session-start] Installing and building draft-agent..."
+cd "$ENGINE/draft-agent"
+npm install --no-audit --no-fund
+npx tsc
+
 echo "[session-start] Installing server dependencies..."
 cd "$ENGINE/server"
 npm install --no-audit --no-fund
