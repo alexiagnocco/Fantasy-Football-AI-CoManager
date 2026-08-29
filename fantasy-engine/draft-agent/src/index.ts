@@ -11,6 +11,7 @@
  * Env: LEAGUE_ID (or LEAGUE_1_ID), TEAM_ID (or LEAGUE_1_TEAM_ID),
  *      ESPN_S2 + ESPN_SWID (required for private leagues).
  */
+import "./env.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";

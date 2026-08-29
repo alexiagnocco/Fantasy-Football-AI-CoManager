@@ -98,6 +98,28 @@ test("kicker is buried before the final two rounds and boosted in them", () => {
   assert.ok(lateK.reasons.some((r) => r.includes("K slot")), "K boosted in final rounds");
 });
 
+test("DST treated as streaming position when the league starts one", () => {
+  const dstConfig: LeagueConfig = {
+    ...config,
+    teamCount: 12,
+    starterSlots: { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, K: 1, DST: 1 },
+  };
+  const pool = [
+    mkPlayer({ id: 1, position: "DST", projectedPoints: 120, adp: 170 }),
+    mkPlayer({ id: 2, position: "RB", projectedPoints: 110, adp: 100 }),
+  ];
+  const ranked = rankPool(pool, dstConfig);
+  const needs = computeRosterNeeds([], dstConfig);
+  // Round 8 of 16: both K and DST open -> DST buried until the last 3 rounds
+  const early = scoreCandidates(ranked, needs, dstConfig, 90, 111, 8, 16);
+  const earlyDst = early.find((c) => c.player.position === "DST")!;
+  assert.ok(earlyDst.score < 0, "DST should be heavily penalized early");
+  // Round 14 of 16 (K + DST open -> window opens at roundsLeft 3)
+  const late = scoreCandidates(ranked, needs, dstConfig, 160, 180, 14, 16);
+  const lateDst = late.find((c) => c.player.position === "DST")!;
+  assert.ok(lateDst.reasons.some((r) => r.includes("DST slot")), "DST boosted late");
+});
+
 test("backup QB penalized in a 1-QB league", () => {
   const pool = [
     mkPlayer({ id: 1, position: "QB", projectedPoints: 320, adp: 60 }),

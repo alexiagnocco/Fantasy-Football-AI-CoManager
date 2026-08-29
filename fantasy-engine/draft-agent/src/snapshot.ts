@@ -6,6 +6,7 @@
  * Usage:  node dist/snapshot.js [leagueId]
  * Env:    LEAGUE_ID / LEAGUE_1_ID, plus ESPN_S2 / ESPN_SWID for private leagues.
  */
+import "./env.js";
 import { espnClient } from "./services/espnClient.js";
 import { saveSnapshot, SNAPSHOT_PATH } from "./manualSession.js";
 

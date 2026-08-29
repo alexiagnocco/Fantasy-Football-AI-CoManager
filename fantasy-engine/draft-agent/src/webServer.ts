@@ -6,6 +6,7 @@
  *
  * Usage: npm run web   (default http://localhost:3210)
  */
+import "./env.js";
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";

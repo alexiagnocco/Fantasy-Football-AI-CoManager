@@ -145,7 +145,10 @@ export function scoreCandidates(
   totalRounds: number
 ): ScoredCandidate[] {
   const roundsLeft = totalRounds - currentRound + 1;
-  const kSlotOpen = (needs.openStarterSlots["K"] ?? 0) > 0;
+  // K and DST are streaming positions: draft one each, only in the final rounds.
+  const openStreaming = ["K", "DST"].filter(
+    (pos) => (needs.openStarterSlots[pos] ?? 0) > 0
+  ).length;
 
   // Best projection still expected to be around at my NEXT pick, per position -
   // this is what makes waiting a real, quantified alternative.
@@ -170,16 +173,17 @@ export function scoreCandidates(
     const flexFits = flexOpen && (SLOT_ELIGIBILITY["FLEX"] ?? []).includes(p.position);
     const have = needs.positionCounts[p.position] ?? 0;
 
-    if (p.position === "K") {
-      if (roundsLeft > 2) {
+    if (p.position === "K" || p.position === "DST") {
+      const slotOpen = (needs.openStarterSlots[p.position] ?? 0) > 0;
+      if (!slotOpen) {
         score -= 100;
-        reasons.push("Never draft a K before the final two rounds");
-      } else if (kSlotOpen) {
-        score += 40;
-        reasons.push("K slot must be filled - now is the time");
+        reasons.push(`Already have a ${p.position}; never roster two`);
+      } else if (roundsLeft > openStreaming + 1) {
+        score -= 100;
+        reasons.push(`Never draft a ${p.position} before the final rounds`);
       } else {
-        score -= 100;
-        reasons.push("Already have a K; never roster two");
+        score += 40;
+        reasons.push(`${p.position} slot must be filled - now is the time`);
       }
     } else if (directOpen) {
       score += 15;
@@ -260,13 +264,13 @@ export function roundAdvice(
 ): string {
   const roundsLeft = totalRounds - round + 1;
   const starterGap = Object.values(needs.openStarterSlots).reduce((a, b) => a + b, 0);
-  const kOpen = (needs.openStarterSlots["K"] ?? 0) > 0;
+  const streamOpen = ["K", "DST"].filter((pos) => (needs.openStarterSlots[pos] ?? 0) > 0);
 
-  if (roundsLeft <= 1 && kOpen) {
-    return "Final round: take your kicker now if you still need one - highest-projected K with a late bye.";
+  if (streamOpen.length && roundsLeft <= streamOpen.length) {
+    return `Final rounds: fill ${streamOpen.join(" and ")} now - highest projection with a late bye.`;
   }
-  if (roundsLeft <= 2 && kOpen) {
-    return "Last two rounds: one of these picks is your kicker. Use the other on your best remaining upside stash.";
+  if (streamOpen.length && roundsLeft <= streamOpen.length + 1) {
+    return `Last ${roundsLeft} rounds: ${streamOpen.join(" and ")} still open - one pick each, use any spare pick on your best upside stash.`;
   }
   if (round <= 3) {
     return "Rounds 1-3: lock in elite RB/WR anchors. In half-PPR with only 2 WR slots, workhorse RBs carry extra weight; take the best combination of two RBs and one WR (or 2/2 by round 4) unless a top-3 positional player falls.";
@@ -282,13 +286,15 @@ export function roundAdvice(
   if (starterGap > roundsLeft) {
     return `Warning: ${starterGap} starter slots open with only ${roundsLeft} picks left - fill required slots immediately.`;
   }
-  return "Late rounds: swing for upside - handcuffs to your own RBs, ambiguous-backfield RBs, breakout WRs. Never a second QB/TE/K in this roster format; a bench spot on upside beats insurance.";
+  return "Late rounds: swing for upside - handcuffs to your own RBs, ambiguous-backfield RBs, breakout WRs. Never a second QB/TE/K/DST in this roster format; a bench spot on upside beats insurance.";
 }
 
 export function strategyGuide(config: LeagueConfig, totalRounds: number): string {
   const starters = Object.entries(config.starterSlots)
     .map(([s, n]) => `${n} ${s}`)
     .join(", ");
+  const hasDst = (config.starterSlots["DST"] ?? 0) > 0;
+  const stream = hasDst ? "K and D/ST" : "your kicker";
   return `# Draft Strategy - ${config.teamCount}-team, ${config.scoringLabel}
 **Lineup**: ${starters} + ${config.benchSlots} bench | **Rounds**: ${totalRounds}
 
@@ -296,7 +302,9 @@ export function strategyGuide(config: LeagueConfig, totalRounds: number): string
 - **${config.teamCount} teams is shallow**: the waiver wire stays useful all season, so upside beats safety on the bench, and QB/TE/K replacement level is high - never reach for them.
 - **Only 2 WR + 1 FLEX**: WR depth is less valuable than in 3-WR leagues; elite RBs (scarcer, and boosted less by receptions in half-PPR than WRs in full PPR) are the premium asset.
 - **Half PPR** narrows the RB-vs-WR gap vs full PPR: pass-catching RBs are gold; volume TDs matter more for WRs.
-- **No D/ST slot** means one fewer throwaway pick - that's an extra lottery ticket for your bench.
+${hasDst
+  ? "- **K and D/ST are pure streaming positions**: one each, in the final rounds only - the projection spread among startable options is tiny."
+  : "- **No D/ST slot** means one fewer throwaway pick - that's an extra lottery ticket for your bench."}
 
 ## Round-by-round plan
 | Rounds | Plan |
@@ -305,11 +313,11 @@ export function strategyGuide(config: LeagueConfig, totalRounds: number): string
 | 4-6 | Complete RB2/WR2, then best value. This is the sweet spot for a top-6 QB or top-tier TE *if one falls*. |
 | 7-9 | QB and TE must be secured in this window. Otherwise RB/WR value + FLEX depth. |
 | 10-${Math.max(11, totalRounds - 2)} | Upside bench: handcuffs, rookies with paths to volume, bye-week cover for RB/WR. No QB2/TE2. |
-| ${Math.max(12, totalRounds - 1)}-${totalRounds} | Kicker in one of the final two picks (never earlier), best stash with the other. |
+| ${Math.max(12, totalRounds - 1)}-${totalRounds} | ${stream} in the final picks (never earlier), best stash with anything left over. |
 
 ## Standing rules the recommend tool enforces
-1. **Kicker last** - the projection spread between K1 and K11 is smaller than one good RB handcuff hitting.
-2. **One QB, one TE** - backups at one-starter positions are wasted roster spots in an 11-team league.
+1. **${hasDst ? "K and D/ST last" : "Kicker last"}** - the projection spread among startable options is smaller than one good RB handcuff hitting.
+2. **One QB, one TE${hasDst ? ", one K, one D/ST" : ""}** - backups at one-starter positions are wasted roster spots in a ${config.teamCount}-team league.
 3. **Tier cliffs beat need** - when a position's last tier-2 player will be gone by your next pick, take them even if the "need" says otherwise.
 4. **Don't triple-stack byes** at RB/WR among starters.
 5. **ADP is a market price** - falling players are discounts; reaching 15+ picks early is paying retail for nothing.`;
