@@ -31,6 +31,8 @@ fantasy-engine/
 │   └── src/commands/     # thursday, sunday, monday, tuesday, phase4, workflow
 ├── mcp-server/       # Claude Desktop MCP integration (see Known Issues)
 │   └── src/tools/        # MCP tools for fantasy operations
+├── draft-agent/      # Standalone interactive draft MCP server (no shared/ dependency; compiles clean)
+│   └── src/              # espnClient, draftMath (snake picks), strategy (VORP/needs/scoring), 4 MCP tools
 └── server/           # Local Express API for ESPN auth + manual exploration
     └── src/
         ├── routes/       # auth, espn, test
@@ -78,10 +80,11 @@ A single workflow drives everything: `.github/workflows/fantasy-phase4-intellige
 ### Season year — computed, not hardcoded
 `getCurrentNFLSeasonYear()` derives the season from the current date: Jan/Feb belong to the previous season's playoffs/offseason, everything else to the season starting that year.
 
-It is currently **duplicated in three places** that must be kept in sync:
+It is currently **duplicated in four places** that must be kept in sync:
 - `shared/src/services/espnApi.ts` (exported; also used by `fantasyProsApi.ts`)
 - `server/src/services/espnApi.ts` (exported; used by all three route files)
 - `mcp-server/src/services/espnApi.ts` (private static) and an inline copy in `mcp-server/src/services/draftApi.ts`
+- `draft-agent/src/constants.ts` (exported; kept local so that module stays standalone)
 
 Known edge: from March onward the helper returns the current year, but ESPN may not have opened that season yet, which can 404 during the spring offseason.
 

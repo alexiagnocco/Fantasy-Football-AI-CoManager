@@ -71,3 +71,5 @@ test-*.js
 # Temporary files
 *.tmp
 *.temp
+# Draft agent runtime data (snapshot + live draft state)
+fantasy-engine/draft-agent/data/
