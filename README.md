@@ -1,307 +1,84 @@
 # Fantasy Football AI CoManager 🏈🤖
 
-An intelligent ESPN Fantasy Football management system that combines automated GitHub Actions workflows with Claude Desktop integration through MCP (Model Context Protocol). The system analyzes your ESPN leagues and provides AI-driven recommendations for lineup optimization, waiver wire targets, and trade analysis.
+AI-driven management for ESPN Fantasy Football private leagues. The system runs as scheduled GitHub Actions automation and as MCP servers for Claude Desktop / Claude Code — lineup optimization, waiver analysis, trade recommendations, and a live draft agent. Backend/automation only; there is no web frontend (the draft agent ships a small local draft board for in-person drafts).
 
-## 🎯 What This Does
+## What's in the repo
 
-Transform your fantasy football management with AI that:
-- **Analyzes your ESPN leagues** - Fetches real-time data from ESPN Fantasy API
-- **Optimizes lineups** - Sets optimal lineups based on projections and matchups  
-- **Identifies waiver targets** - Finds breakout players before your competition
-- **Evaluates trades** - Provides fair trade analysis with projected impact
-- **Runs automatically** - GitHub Actions or on-demand through Claude Desktop
+```
+fantasy-engine/
+├── shared/           # Core library: ESPN API client, LLM providers, cost monitoring
+├── automation/       # GitHub Actions CLI (the only module CI builds)
+├── draft-agent/      # Standalone draft MCP server + offline draft board + league history analysis
+├── mcp-server/       # Legacy Claude Desktop MCP integration (unmaintained, does not compile)
+└── server/           # Local Express API for ESPN auth (Puppeteer) + manual exploration
+docs/archive/         # Historical docs and scripts, kept for reference only
+```
 
-## 🚀 Quick Start
+- **[CLAUDE.md](./CLAUDE.md)** — full developer guide: build commands, architecture, known issues.
+- **[fantasy-engine/draft-agent/README.md](./fantasy-engine/draft-agent/README.md)** — draft agent setup and usage.
 
-### Choose Your Path
+## The draft agent (start here)
 
-#### Path 1: GitHub Actions Automation (Set It & Forget It)
-Best for: Users who want automated daily/weekly analysis sent to Discord
-
-#### Path 2: Claude Desktop + MCP (Interactive AI Assistant)
-Best for: Users who want conversational AI help with fantasy decisions
-
-#### Path 3: Local POC (Development & Testing)
-Best for: Developers who want to test ESPN API integration
-
-## 📚 Documentation
-
-### Core Documentation
-- [**Setup Guide for Friends**](./SETUP_GUIDE_FOR_FRIENDS.md) - Easy setup guide for non-developers
-- [**GitHub Actions Flow**](./FLOWCHART.md) - Visual flowchart of the automation workflow
-- [**MCP + Claude Desktop Flow**](./MCP_CLAUDE_DESKTOP_FLOWCHART.md) - Integration with Claude Desktop
-- [**Technical Fixes**](./ESPN_API_FIXES_REPORT.md) - Recent ESPN API data collection improvements
-- [**Phase 4 Intelligence**](./PHASE4_ADVANCED_INTELLIGENCE.md) - Advanced AI system documentation
-
-### For Developers
-- [**CLAUDE.md**](./CLAUDE.md) - Instructions for Claude Code development
-- [**System Prompt**](./SYSTEM_PROMPT.md) - AI prompting guidelines
-
-## 🛠️ Installation
-
-### Prerequisites
-- Node.js 16+ and npm
-- ESPN Fantasy Football account
-- GitHub account (for Actions) OR Claude Desktop (for MCP)
-
-### Option 1: GitHub Actions Setup
-
-1. **Fork this repository**
-2. **Get ESPN cookies** (see Authentication section)
-3. **Add GitHub Secrets**:
-   ```
-   ESPN_S2          # Your espn_s2 cookie
-   ESPN_SWID        # Your SWID cookie  
-   LEAGUE_1_ID      # Your league ID
-   LEAGUE_1_TEAM_ID # Your team ID
-   GEMINI_API_KEY   # Google Gemini API key (free tier)
-   DISCORD_WEBHOOK_URL # Discord channel webhook
-   ```
-4. **Enable GitHub Actions** in your fork
-5. **Automated runs**:
-   - Daily at 8 AM ET
-   - Hourly during games (Sun/Mon/Thu)
-   - Manual trigger anytime
-
-### Option 2: Claude Desktop + MCP Setup
-
-1. **Clone repository**:
-   ```bash
-   git clone https://github.com/yourusername/FantasyCoManager.git
-   cd FantasyCoManager/fantasy-engine/mcp-server
-   ```
-
-2. **Build MCP server**:
-   ```bash
-   npm install
-   npm run build
-   ```
-
-3. **Configure Claude Desktop** (`~/.config/Claude/claude_desktop_config.json`):
-   ```json
-   {
-     "mcpServers": {
-       "fantasy-football": {
-         "command": "node",
-         "args": ["/path/to/fantasy-engine/mcp-server/dist/index.js"],
-         "cwd": "/path/to/fantasy-engine/mcp-server"
-       }
-     }
-   }
-   ```
-
-4. **Restart Claude Desktop** and ask:
-   - "Help me with my fantasy team"
-   - "Who should I start this week?"
-   - "Find waiver wire targets"
-
-### Option 3: Local Development POC
+The newest and healthiest module. An MCP server that tracks a live ESPN draft (or a fully offline in-person draft) and recommends picks with snake-aware pick math, VORP from your league's real lineup slots, bye-week awareness, and format-tuned strategy.
 
 ```bash
-# Clone and navigate
-git clone https://github.com/yourusername/FantasyCoManager.git
-cd FantasyCoManager/fantasy-engine
+cd fantasy-engine/draft-agent
+npm install && npm run build
+npm test
 
-# Quick start (both frontend and backend)
-./start-poc.sh
-
-# Or manually:
-cd server && npm install && npm run dev  # Backend on :3003
-cd client && npm install && npm run dev  # Frontend on :5173
+npm run snapshot     # one-time bulk load of the player pool (for offline drafting)
+npm run web          # local draft board at http://localhost:3210
 ```
 
-## 🔐 ESPN Authentication
+Point Claude Desktop or Claude Code at `dist/index.js` (config in the module README). The web board and the MCP tools share state, so you can click picks in the browser while asking Claude "who should I take and why?"
 
-### Getting Your ESPN Cookies
-
-1. **Login to ESPN Fantasy** in Chrome/Firefox
-2. **Open DevTools** (F12) → Application → Cookies
-3. **Find on fantasy.espn.com**:
-   - `espn_s2` - Long authentication token
-   - `SWID` - UUID in curly braces like `{123-456-789}`
-4. **Copy these values** for configuration
-
-### Finding Your League Info
-
-From your ESPN Fantasy league URL:
-```
-https://fantasy.espn.com/football/league?leagueId=123456
-                                              ^^^^^^ Your League ID
-
-https://fantasy.espn.com/football/team?leagueId=123456&teamId=3
-                                                         ^^^^^^ Your Team ID
-```
-
-## 💡 Usage Examples
-
-### With GitHub Actions
-Once configured, the system automatically:
-- **Thursday 6 PM**: Pre-game optimization
-- **Sunday 11 AM**: Final lineup checks
-- **Monday 8 AM**: Waiver wire analysis  
-- **Tuesday 10 AM**: Trade recommendations
-
-Results sent to your Discord channel.
-
-### With Claude Desktop
-Ask Claude naturally:
-- "Show me my current roster"
-- "Who should I start: Player A or Player B?"
-- "What's the best waiver pickup this week?"
-- "Is this trade fair: My RB1 for their WR1?"
-
-### With Local POC
-Access http://localhost:5173 to:
-- View your roster with live ESPN data
-- Test ESPN API endpoints
-- See player projections and stats
-
-## 🏗️ Architecture
-
-### System Components
-
-```
-┌─────────────────────────────────────────────────┐
-│                   User Interfaces                │
-├──────────┬────────────┬────────────┬────────────┤
-│  GitHub  │   Claude   │    Web     │    CLI     │
-│  Actions │  Desktop   │    POC     │   Tools    │
-└──────────┴────────────┴────────────┴────────────┘
-                           │
-┌─────────────────────────────────────────────────┐
-│              Core Services Layer                 │
-├──────────────────────────────────────────────────┤
-│  • ESPN API Integration (Authentication, Data)   │
-│  • FantasyPros Rankings Integration              │
-│  • AI Orchestration (Gemini, Claude, GPT)        │
-│  • Data Processing & Slot Categorization         │
-└─────────────────────────────────────────────────┘
-                           │
-┌─────────────────────────────────────────────────┐
-│                 Data Sources                     │
-├──────────────────────────────────────────────────┤
-│  • ESPN Fantasy API (Rosters, Matchups, Stats)   │
-│  • FantasyPros (Expert Rankings, Projections)    │
-│  • Weather API (Game Conditions)                 │
-│  • News Feeds (Injury Reports, Breaking News)    │
-└─────────────────────────────────────────────────┘
-```
-
-### Key Features by Component
-
-**GitHub Actions Automation** (`fantasy-engine/automation/`)
-- Phase 4 Advanced Intelligence System
-- Scheduled and manual workflows
-- Discord webhook notifications
-- Multi-league support
-
-**MCP Server** (`fantasy-engine/mcp-server/`)
-- 10+ MCP tools for ESPN data access
-- Lineup optimization algorithms
-- Trade and waiver analysis
-- Direct Claude Desktop integration
-
-**Web POC** (`fantasy-engine/client/` + `fantasy-engine/server/`)
-- React 19 + TypeScript frontend
-- Express + Puppeteer backend
-- ESPN authentication handling
-- API testing interface
-
-**Shared Library** (`fantasy-engine/shared/`)
-- ESPN API client with 2025 season support
-- Roster slot categorization (26 position types)
-- Projection normalization (weekly vs season)
-- AI workflow orchestration
-
-## 🔧 Recent Improvements
-
-### ESPN Data Collection Fixes (Completed)
-✅ Fixed weekly vs season projection logic  
-✅ Enhanced FantasyPros player matching with position validation  
-✅ Standardized ESPN API to use 2025 season  
-✅ Improved slot categorization for all roster positions  
-✅ Added comprehensive logging for debugging  
-
-### Repository Cleanup (Completed)
-✅ Removed duplicate MCP server (saved 40% repository size)  
-✅ Cleaned up 18 outdated documentation files  
-✅ Streamlined to essential, current documentation  
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**"ESPN authentication failed"**
-- Cookies expire after ~30 days
-- Get fresh cookies from ESPN website
-- Update secrets/config with new values
-
-**"No roster data available"**
-- Verify League ID and Team ID are correct
-- Check if league is private (requires auth)
-- Ensure cookies are from correct ESPN account
-
-**"Port already in use" (Local POC)**
-- Another instance is running
-- Kill existing process or use different port
-
-**GitHub Actions not running**
-- Check if Actions are enabled in fork
-- Verify all secrets are set correctly
-- Check workflow logs for specific errors
-
-### Debug Commands
+It also includes a **league history analysis toolkit** (`analysis/`): pulls every past season from ESPN's `leagueHistory` API and reports champion draft construction, rival draft tendencies, head-to-head records, and trade/waiver patterns.
 
 ```bash
-# Test ESPN authentication
-curl -H "Cookie: espn_s2=YOUR_COOKIE; SWID=YOUR_SWID" \
-  "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/YOUR_LEAGUE_ID"
-
-# Check MCP server
-node fantasy-engine/mcp-server/dist/index.js
-
-# View GitHub Actions logs
-# Go to Actions tab → Select workflow → View logs
+python3 analysis/fetch_history.py      # pulls all seasons (uses .env credentials)
+python3 analysis/analyze_history.py    # prints the digest, writes analysis/out/analysis.json
 ```
 
-## 📊 Performance
+## GitHub Actions automation
 
-- **ESPN API Response**: < 500ms average
-- **Lineup Optimization**: < 2 seconds
-- **Full Analysis**: < 5 seconds
-- **MCP Tool Execution**: < 1 second each
-- **GitHub Actions Runtime**: ~2-3 minutes total
+A single workflow, `.github/workflows/fantasy-phase4-intelligence.yml`, drives everything:
 
-## 🔒 Security & Privacy
+- **NFL season only** (September–January). Nothing runs February–August except manual dispatch.
+- Daily analysis at 13:00 UTC; game-day monitoring every 4h on Sun/Mon/Thu; waiver analysis Tuesdays 14:00 UTC.
+- Manual runs via `workflow_dispatch` with `intelligence_mode` (full / realtime / learning / analytics / seasonal / emergency), `week`, and `force_execution`.
+- Results post to Discord via webhook.
 
-- ESPN cookies stored as secrets (GitHub) or locally (MCP/POC)
-- No credentials sent to third parties
-- AI providers receive only anonymized fantasy data
-- All data processing happens in your environment
+Setup: fork, then add repository **secrets** (`ESPN_S2`, `ESPN_SWID`, `LEAGUE_1_ID`, `LEAGUE_1_TEAM_ID`, `GEMINI_API_KEY`, `DISCORD_WEBHOOK_URL`, …) and optional **variables** (`GEMINI_MODEL`, `PRIMARY_LLM_PROVIDER`). See `.env.example` for the full list.
 
-## 🤝 Contributing
+```bash
+# What CI builds — verify changes against this
+cd fantasy-engine/automation && npm ci && npm run build
+node dist/cli.js --help
+```
 
-Contributions welcome! Areas for improvement:
-- Additional MCP tools for Claude
-- Enhanced trade algorithms
-- More LLM provider support
-- Dynasty league features
-- Keeper league optimization
+## ESPN authentication
 
-## 📝 License
+Private leagues need two cookies from a logged-in browser (DevTools → Application → Cookies → `fantasy.espn.com`):
 
-MIT License - See LICENSE file for details
+- `espn_s2` — long auth token (200+ chars), keep it URL-encoded exactly as shown
+- `SWID` — UUID in curly braces, e.g. `{123-456-789}`
 
-## 🙏 Acknowledgments
+Cookies expire after ~30 days. They go in GitHub secrets (automation), the MCP `env` block or `.env` (draft agent), or headers to the local server. The local server (`fantasy-engine/server`, port 3003) can alternatively automate login with Puppeteer.
 
-- ESPN Fantasy API (unofficial)
-- FantasyPros for expert rankings
-- Anthropic for Claude and MCP
-- Google for Gemini API
-- The fantasy football community
+League and team IDs come from your league URL: `…/league?leagueId=XXXX` and `…/team?…&teamId=N`.
 
----
+## LLM providers
 
-**Built with ❤️ for fantasy football managers who want an AI edge**
+Gemini is the default; Claude, OpenAI, and Perplexity are supported (`shared/src/services/llm/providers/`). Select with `PRIMARY_LLM_PROVIDER` / `FALLBACK_LLM_PROVIDER`; override the Gemini model with `GEMINI_MODEL` — never hardcode model names. Cost limits (`DAILY_COST_LIMIT`, etc.) are enforced by the cost monitor.
 
-*Not affiliated with ESPN or Disney. Use responsibly and within ESPN's terms of service.*
+## Known issues
+
+See the **Known Issues & Limitations** section of [CLAUDE.md](./CLAUDE.md) for the authoritative list. Highlights:
+
+- `mcp-server/` does not compile (~40 pre-existing TypeScript errors) and is effectively legacy; the draft agent replaced its draft features. CI only builds `automation/`.
+- `shared/` and `mcp-server/` contain duplicated service files that must be edited in both places.
+- ESPN rate limiting is not handled (surfaces as 429s), and the unofficial ESPN API can change without notice.
+
+## License
+
+MIT. Not affiliated with ESPN or Disney — use responsibly and within ESPN's terms of service.

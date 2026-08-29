@@ -32,12 +32,17 @@ fantasy-engine/
 ├── mcp-server/       # Claude Desktop MCP integration (see Known Issues)
 │   └── src/tools/        # MCP tools for fantasy operations
 ├── draft-agent/      # Standalone interactive draft MCP server (no shared/ dependency; compiles clean)
-│   └── src/              # espnClient, draftMath (snake picks), strategy (VORP/needs/scoring), 4 MCP tools
+│   ├── src/              # espnClient, draftMath (snake picks), strategy (VORP/needs/scoring), 4 MCP tools
+│   │                     # plus snapshot.ts (offline bulk load), webServer.ts (local draft board :3210)
+│   ├── web/              # single-page manual draft board served by webServer
+│   └── analysis/         # Python league-history toolkit (fetch_history.py, analyze_history.py)
 └── server/           # Local Express API for ESPN auth + manual exploration
     └── src/
         ├── routes/       # auth, espn, test
         └── services/     # espnAuth (Puppeteer), manualAuth, espnApi, espnDebug
 ```
+
+Historical docs and one-off scripts live in `docs/archive/` (see its README); nothing there is maintained. `mcp-server/`'s seven usage guides were archived there — the draft agent replaced its draft features.
 
 `shared/` is consumed via `file:../shared` by both `automation/` and `mcp-server/`. Changing anything in `shared/` requires rebuilding it before dependents pick it up — the `build` scripts in those two modules do this automatically.
 
@@ -55,6 +60,14 @@ cd fantasy-engine/shared && npm ci && npm run build
 # Local API server
 cd fantasy-engine/server && npm run dev     # http://localhost:3003
 cd fantasy-engine/server && npm run build && npm start
+
+# Draft agent
+cd fantasy-engine/draft-agent && npm ci && npm run build
+npm test                # pick math + strategy unit tests
+npm run snapshot        # bulk-load player pool to data/snapshot.json (offline drafting)
+npm run web             # manual draft board at http://localhost:3210
+python3 analysis/fetch_history.py    # pull all past seasons from ESPN leagueHistory API
+python3 analysis/analyze_history.py  # champions/rivals/H2H/transactions digest -> analysis/out/
 ```
 
 ### Automation CLI commands
