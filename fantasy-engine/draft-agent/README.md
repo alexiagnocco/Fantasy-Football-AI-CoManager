@@ -2,7 +2,7 @@
 
 Interactive ESPN Fantasy Football **draft agent** as an MCP server. Point Claude Desktop (or any MCP client) at it during a live draft and it tracks the board in real time and recommends picks.
 
-Unlike the legacy `mcp-server/` draft tools, this module is standalone (no `shared/` dependency), compiles clean under strict TypeScript, and its recommendations account for:
+Unlike the removed legacy `mcp-server/` draft tools, this module is standalone (no `shared/` dependency), compiles clean under strict TypeScript, and its recommendations account for:
 
 - **Your draft position** - snake-aware pick math: it knows your exact upcoming pick numbers and plans against them.
 - **Who remains** - live board from ESPN's draft detail feed; VORP computed against replacement level derived from *your league's actual lineup slots*.

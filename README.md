@@ -9,7 +9,6 @@ fantasy-engine/
 ├── shared/           # Core library: ESPN API client, Claude LLM provider, cost monitoring
 ├── automation/       # CLI for scheduled/manual analysis runs (legacy GitHub Actions era)
 ├── draft-agent/      # Standalone draft MCP server + offline draft board + league history analysis
-├── mcp-server/       # Legacy Claude Desktop MCP integration (unmaintained, does not compile)
 └── server/           # Local Express API for ESPN auth (Puppeteer) + manual exploration
 docs/archive/         # Historical docs and scripts, kept for reference only
 reports/ (branch)     # Daily reports committed by the Claude cloud routine
@@ -63,7 +62,7 @@ Private leagues need two cookies from a logged-in browser (DevTools → Applicat
 - `espn_s2` — long auth token (200+ chars), keep it URL-encoded exactly as shown
 - `SWID` — UUID in curly braces, e.g. `{123-456-789}`
 
-Cookies expire after ~30 days. They go in GitHub secrets (automation), the MCP `env` block or `.env` (draft agent), or headers to the local server. The local server (`fantasy-engine/server`, port 3003) can alternatively automate login with Puppeteer.
+Cookies expire after ~30 days. They go in the cloud environment's env vars (scheduled routine), the MCP `env` block or `.env` (draft agent), or headers to the local server. The local server (`fantasy-engine/server`, port 3003) can alternatively automate login with Puppeteer.
 
 League and team IDs come from your league URL: `…/league?leagueId=XXXX` and `…/team?…&teamId=N`.
 
@@ -75,8 +74,6 @@ Claude is the only provider (`shared/src/services/llm/providers/claude.ts`). Set
 
 See the **Known Issues & Limitations** section of [CLAUDE.md](./CLAUDE.md) for the authoritative list. Highlights:
 
-- `mcp-server/` does not compile (~40 pre-existing TypeScript errors) and is effectively legacy; the draft agent replaced its draft features. CI only builds `automation/`.
-- `shared/` and `mcp-server/` contain duplicated service files that must be edited in both places.
 - ESPN rate limiting is not handled (surfaces as 429s), and the unofficial ESPN API can change without notice.
 
 ## License

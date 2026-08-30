@@ -29,8 +29,6 @@ fantasy-engine/
 │       └── types/
 ├── automation/       # Analysis CLI (formerly driven by GitHub Actions; now manual-run only)
 │   └── src/commands/     # thursday, sunday, monday, tuesday, phase4, workflow
-├── mcp-server/       # Claude Desktop MCP integration (see Known Issues)
-│   └── src/tools/        # MCP tools for fantasy operations
 ├── draft-agent/      # Standalone interactive draft MCP server (no shared/ dependency; compiles clean)
 │   ├── src/              # espnClient, draftMath (snake picks), strategy (VORP/needs/scoring), 4 MCP tools
 │   │                     # plus snapshot.ts (offline bulk load), webServer.ts (local draft board :3210)
@@ -42,9 +40,9 @@ fantasy-engine/
         └── services/     # espnAuth (Puppeteer), manualAuth, espnApi, espnDebug
 ```
 
-Historical docs and one-off scripts live in `docs/archive/` (see its README); nothing there is maintained. `mcp-server/`'s seven usage guides were archived there — the draft agent replaced its draft features.
+Historical docs and one-off scripts live in `docs/archive/` (see its README); nothing there is maintained. The legacy `mcp-server/` module was removed 2026-08-29 (its seven usage guides were already archived; the draft agent replaced its draft features).
 
-`shared/` is consumed via `file:../shared` by both `automation/` and `mcp-server/`. Changing anything in `shared/` requires rebuilding it before dependents pick it up — the `build` scripts in those two modules do this automatically.
+`shared/` is consumed via `file:../shared` by `automation/`. Changing anything in `shared/` requires rebuilding it before dependents pick it up — `automation/`'s `build` script does this automatically.
 
 ## Essential Commands
 
@@ -96,7 +94,6 @@ The GitHub Actions workflow was retired (2026-08-29). Scheduled analysis now run
 It is currently **duplicated in four places** that must be kept in sync:
 - `shared/src/services/espnApi.ts` (exported; also used by `fantasyProsApi.ts`)
 - `server/src/services/espnApi.ts` (exported; used by all three route files)
-- `mcp-server/src/services/espnApi.ts` (private static) and an inline copy in `mcp-server/src/services/draftApi.ts`
 - `draft-agent/src/constants.ts` (exported; kept local so that module stays standalone)
 
 Known edge: from March onward the helper returns the current year, but ESPN may not have opened that season yet, which can 404 during the spring offseason.
@@ -149,7 +146,7 @@ Claude is the only provider (`shared/src/services/llm/providers/`: `base`, `clau
 1. Add the method to `shared/src/services/espnApi.ts` (and mirror it in `server/src/services/espnApi.ts` if the local API needs it)
 2. Add types to `shared/src/types/`
 3. Expose a route in `server/src/routes/espn.ts` if it should be reachable locally
-4. Surface it to automation via `shared/src/tools/` or to Claude Desktop via `mcp-server/src/tools/`
+4. Surface it to automation via `shared/src/tools/` or to Claude Desktop via the draft agent's MCP tools (`draft-agent/src/tools/`)
 
 ### Error handling
 - **401**: cookies expired or invalid — re-authenticate
@@ -184,8 +181,6 @@ sudo apt-get install -y chromium-browser     # Debian/Ubuntu
 
 ## Known Issues & Limitations
 
-- **`mcp-server/` does not compile.** It has ~40 pre-existing TypeScript errors: missing deps in its `package.json` and imports referencing exports `shared` no longer has (including the removed Gemini/OpenAI/Perplexity providers). Nothing builds it.
-- **`shared/` and `mcp-server/` contain duplicated copies** of `enhancedCostMonitor.ts`, `costMonitor.ts`, `abTesting.ts`, `espnApi.ts`, and `feedbackLoop.ts` (mcp-server also still carries the removed providers). `mcp-server/` is legacy and was not updated in the Claude-only migration — treat `shared/` as authoritative.
 - ESPN cookies (`espn_s2`/`SWID`) expire roughly monthly; the cloud routine's reports will flag a 401 when they do — refresh them in the DEVKIT environment settings.
 - The local server's CORS origin is still pinned to `http://localhost:5173`, left over from a removed React client. Harmless but vestigial.
 - Single concurrent user session in the local server (last login wins); no database persistence (memory only).
@@ -194,7 +189,6 @@ sudo apt-get install -y chromium-browser     # Debian/Ubuntu
 ## Development Guidelines
 
 1. **Build `shared/` first** — dependents consume its compiled `dist/`
-2. **Mirror edits into `mcp-server/`** while the duplication exists
 3. **Never hardcode a season year** — use `getCurrentNFLSeasonYear()`
 4. **Never hardcode a model name** — use `CLAUDE_MODEL` and the provider config
 5. **Verify with `cd fantasy-engine/automation && npm run build`** — there is no CI, so this local check is the only gate

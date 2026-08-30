@@ -11,6 +11,6 @@ match the repository.
 | `SETUP_GUIDE_FOR_FRIENDS.md` | Non-developer onboarding guide | References the removed web POC and stale setup steps |
 | `PRODUCTION_GUIDE.md` | Early production-deployment guide | Superseded by root `README.md` and `CLAUDE.md` |
 | `start-poc.sh` | Launcher for server + React client | The `client/` half no longer exists |
-| `install.sh`, `get-claude-config.sh` | Root copies of mcp-server setup scripts | Duplicates; the module keeps its own copies |
+| `install.sh`, `get-claude-config.sh` | Root copies of mcp-server setup scripts | The `mcp-server/` module itself was removed 2026-08-29 |
 | `claude-desktop-config.example.json` | Claude Desktop config example | Uses old `fantasy-poc/` paths and retired `DEFAULT_LLM_PROVIDER` var |
-| `mcp-server-guides/` | Seven usage/draft/auction guides for `mcp-server/` | `mcp-server/` is unmaintained and does not compile; `draft-agent/` replaced its draft features |
+| `mcp-server-guides/` | Seven usage/draft/auction guides for `mcp-server/` | The `mcp-server/` module was removed 2026-08-29; `draft-agent/` replaced its draft features |

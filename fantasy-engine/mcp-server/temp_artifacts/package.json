@@ -5,21 +5,25 @@
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "build": "cd ../shared && npm run build && cd ../mcp-server && tsc",
-    "build:local": "tsc",
+    "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
-    "test": "npm run build && echo '{\"jsonrpc\":\"2.0\",\"method\":\"tools/list\",\"id\":1}' | node dist/index.js"
+    "prepare": "npm run build"
   },
   "dependencies": {
-    "@fantasy-ai/shared": "file:../shared",
+    "@anthropic-ai/sdk": "^0.60.0",
+    "@google/generative-ai": "^0.24.1",
     "@modelcontextprotocol/sdk": "^1.17.4",
-    "axios": "^1.11.0",
+    "@types/cheerio": "^0.22.35",
+    "axios": "^1.7.9",
     "cheerio": "^1.1.2",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "node-cache": "^5.1.2",
+    "openai": "^5.16.0",
+    "puppeteer": "^24.0.0"
   },
   "devDependencies": {
-    "@types/node": "^22.18.1",
+    "@types/node": "^22.12.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }
