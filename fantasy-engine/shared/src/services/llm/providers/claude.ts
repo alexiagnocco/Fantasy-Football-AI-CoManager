@@ -19,11 +19,9 @@ export class ClaudeProvider extends BaseLLMProvider {
   
   get models(): string[] {
     return [
-      'claude-3-5-sonnet-20241022',
-      'claude-3-5-haiku-20241022',
-      'claude-3-opus-20240229',
-      'claude-3-sonnet-20240229',
-      'claude-3-haiku-20240307'
+      'claude-sonnet-5',
+      'claude-opus-5',
+      'claude-haiku-4-5-20251001'
     ];
   }
   
@@ -51,10 +49,11 @@ export class ClaudeProvider extends BaseLLMProvider {
         !(messages.find(orig => orig.content === m.content)?.role === 'system')
       );
       
+      // Note: current Claude models (Sonnet 5 / Opus 5 / Fable 5) reject the
+      // temperature parameter with a 400, so it is intentionally not sent.
       const requestOptions: any = {
         model: this.config.model,
         max_tokens: options?.max_tokens || this.config.max_tokens || 4000,
-        temperature: options?.temperature || this.config.temperature || 0.7,
         messages: nonSystemMessages
       };
       
@@ -119,16 +118,14 @@ export class ClaudeProvider extends BaseLLMProvider {
   }
   
   getPricing(): { input_cost_per_token: number; output_cost_per_token: number; currency: string } {
-    // Pricing as of early 2025 (in USD per million tokens, converted to per token)
+    // Pricing as of mid 2026 (in USD per million tokens, converted to per token)
     const pricingMap: Record<string, any> = {
-      'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00 },
-      'claude-3-5-haiku-20241022': { input: 1.00, output: 5.00 },
-      'claude-3-opus-20240229': { input: 15.00, output: 75.00 },
-      'claude-3-sonnet-20240229': { input: 3.00, output: 15.00 },
-      'claude-3-haiku-20240307': { input: 0.25, output: 1.25 }
+      'claude-sonnet-5': { input: 2.00, output: 10.00 },
+      'claude-opus-5': { input: 5.00, output: 25.00 },
+      'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00 }
     };
-    
-    const pricing = pricingMap[this.config.model] || pricingMap['claude-3-5-sonnet-20241022'];
+
+    const pricing = pricingMap[this.config.model] || pricingMap['claude-sonnet-5'];
     
     return {
       input_cost_per_token: pricing.input / 1000000,

@@ -8,7 +8,7 @@ export async function getCostSummary() {
     weeklyCost: 1.50,
     monthlyCost: 6.00,
     totalQueries: 45,
-    provider: 'gemini-test',
+    provider: 'claude-test',
     message: 'Cost tracking active (test mode)'
   };
 }

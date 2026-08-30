@@ -49,7 +49,7 @@ export class LLMIntegrationTester {
   }
 
   private async testProviderConnectivity(): Promise<void> {
-    const providers = ['gemini', 'claude', 'openai', 'perplexity'];
+    const providers = ['claude'];
     
     for (const provider of providers) {
       const test = `${provider.charAt(0).toUpperCase() + provider.slice(1)} Provider`;
@@ -130,41 +130,13 @@ export class LLMIntegrationTester {
     const start = Date.now();
     
     try {
-      if (!this.config.llm.fallbackProvider) {
-        this.addResult(test, 'warning',
-          'No fallback provider configured',
-          Date.now() - start
-        );
-        return;
-      }
-      
-      // Test switching between providers
-      const originalProvider = this.config.llm.primaryProvider;
-      const fallbackProvider = this.config.llm.fallbackProvider;
-      
-      // Create test config for fallback
-      const fallbackConfig = await this.createTestConfig(fallbackProvider);
-      const switchResult = await llmConfig.switchProvider(fallbackConfig);
-      
-      if (switchResult) {
-        // Switch back to primary
-        const primaryConfig = await this.createTestConfig(originalProvider);
-        await llmConfig.switchProvider(primaryConfig);
-        
-        this.addResult(test, 'pass',
-          `Failover test successful: ${originalProvider} → ${fallbackProvider} → ${originalProvider}`,
-          Date.now() - start, {
-            primary: originalProvider,
-            fallback: fallbackProvider
-          }
-        );
-      } else {
-        this.addResult(test, 'fail',
-          `Failed to switch to fallback provider: ${fallbackProvider}`,
-          Date.now() - start
-        );
-      }
-      
+      // Claude is the only provider; there is no fallback to fail over to.
+      this.addResult(test, 'warning',
+        'Failover not applicable: Claude is the only configured provider',
+        Date.now() - start
+      );
+      return;
+
     } catch (error: any) {
       this.addResult(test, 'fail', error.message, Date.now() - start);
     }
@@ -227,18 +199,14 @@ export class LLMIntegrationTester {
     const modelEnvVar = `${provider.toUpperCase()}_MODEL`;
     
     const models: { [key: string]: string } = {
-      'gemini': 'gemini-3.7-flash',
-      'claude': 'claude-3-5-sonnet-20241022',
-      'openai': 'gpt-4o-mini',
-      'perplexity': 'llama-3.1-sonar-large-128k-online'
+      'claude': 'claude-sonnet-5'
     };
-    
+
     return {
       provider,
       model: process.env[modelEnvVar] || models[provider],
       api_key: process.env[apiKeyEnvVar],
-      max_tokens: 4000,
-      temperature: 0.7
+      max_tokens: 4000
     };
   }
 

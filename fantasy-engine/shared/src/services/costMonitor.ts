@@ -126,7 +126,7 @@ export class CostMonitor {
         limit: this.limits.per_analysis_limit,
         percentage: (newEntry.cost / this.limits.per_analysis_limit) * 100,
         period: 'single analysis',
-        recommendation: `This analysis cost $${newEntry.cost.toFixed(4)}, which exceeds your per-analysis limit of $${this.limits.per_analysis_limit}. Consider switching to a cheaper model like gemini-3.5-flash-lite.`
+        recommendation: `This analysis cost $${newEntry.cost.toFixed(4)}, which exceeds your per-analysis limit of $${this.limits.per_analysis_limit}. Consider switching to a cheaper model like claude-haiku-4-5-20251001.`
       });
     }
 
@@ -233,7 +233,7 @@ export class CostMonitor {
     }
     
     message += `💡 **Cost-saving options:**\n`;
-    message += `• Switch to gemini-3.5-flash-lite ($0.30/$2.50 per 1M tokens)\n`;
+    message += `• Switch to claude-haiku-4-5-20251001 ($1.00/$5.00 per 1M tokens)\n`;
     message += `• Use notification-only mode (free)\n`;
     message += `• Reduce analysis frequency\n`;
     message += `• Increase cost limits in environment variables\n\n`;
@@ -330,27 +330,21 @@ export class CostMonitor {
   getProviderRecommendations(): { provider: string; model: string; cost_per_analysis: string; best_for: string }[] {
     return [
       {
-        provider: 'gemini',
-        model: 'gemini-3.5-flash-lite',
-        cost_per_analysis: '$0.01-0.03',
+        provider: 'claude',
+        model: 'claude-haiku-4-5-20251001',
+        cost_per_analysis: '$0.01-0.05',
         best_for: 'Budget-conscious users'
       },
       {
-        provider: 'openai', 
-        model: 'gpt-4o-mini',
-        cost_per_analysis: '$0.02-0.05',
+        provider: 'claude',
+        model: 'claude-sonnet-5',
+        cost_per_analysis: '$0.05-0.15',
         best_for: 'Balanced cost/quality'
       },
       {
-        provider: 'perplexity',
-        model: 'llama-3.1-sonar-large-128k-online',
-        cost_per_analysis: '$0.05-0.10',
-        best_for: 'Real-time data needs'
-      },
-      {
         provider: 'claude',
-        model: 'claude-3-5-sonnet-20241022',
-        cost_per_analysis: '$0.10-0.25',
+        model: 'claude-opus-5',
+        cost_per_analysis: '$0.10-0.30',
         best_for: 'Highest quality analysis'
       }
     ];

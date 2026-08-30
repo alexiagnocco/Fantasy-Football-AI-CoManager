@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 export interface CostRecord {
   id: string;
   timestamp: Date;
-  provider: 'openai' | 'anthropic' | 'google' | 'basic';
+  provider: 'anthropic' | 'basic';
   model: string;
   operation: string;
   inputTokens: number;
@@ -75,23 +75,12 @@ class EnhancedCostMonitor {
     monthly: 20.0    // $20.00 per month
   };
 
-  // Pricing per 1K tokens (approximate)
+  // Pricing per 1K tokens (approximate, as of mid 2026)
   private readonly pricing = {
-    openai: {
-      'gpt-4o': { input: 0.005, output: 0.015 },
-      'gpt-4o-mini': { input: 0.00015, output: 0.0006 },
-      'gpt-3.5-turbo': { input: 0.0005, output: 0.0015 }
-    },
     anthropic: {
-      'claude-3-5-sonnet-20241022': { input: 0.003, output: 0.015 },
-      'claude-3-5-haiku-20241022': { input: 0.001, output: 0.005 },
-      'claude-3-opus-20240229': { input: 0.015, output: 0.075 }
-    },
-    google: {
-      'gemini-3.7-flash': { input: 0.00075, output: 0.00375 },
-      'gemini-3.6-flash': { input: 0.00075, output: 0.00375 },
-      'gemini-3.5-flash-lite': { input: 0.0003, output: 0.0025 },
-      'gemini-3.1-pro-preview': { input: 0.002, output: 0.012 }
+      'claude-sonnet-5': { input: 0.002, output: 0.010 },
+      'claude-opus-5': { input: 0.005, output: 0.025 },
+      'claude-haiku-4-5-20251001': { input: 0.001, output: 0.005 }
     }
   };
 
@@ -389,13 +378,13 @@ class EnhancedCostMonitor {
     const strategies: CostOptimization[] = [];
 
     // Strategy 1: Use cheaper models for simple tasks
-    if (summary.byProvider['openai']?.operations > 10) {
-      const potentialSavings = summary.byProvider['openai'].cost * 0.7;
+    if (summary.byProvider['anthropic']?.operations > 10) {
+      const potentialSavings = summary.byProvider['anthropic'].cost * 0.5;
       strategies.push({
-        strategy: 'Use GPT-4o-mini for simple decisions',
+        strategy: 'Use Claude Haiku for simple decisions',
         estimatedSavings: potentialSavings,
         impactOnPerformance: 'low',
-        implementation: 'Switch to gpt-4o-mini for lineup optimization and basic queries'
+        implementation: 'Switch to claude-haiku-4-5-20251001 for lineup optimization and basic queries'
       });
     }
 

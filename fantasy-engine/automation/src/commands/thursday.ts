@@ -105,7 +105,7 @@ export async function executeThursdayOptimization(options: ThursdayOptions): Pro
       },
       confidence: 85,
       llmUsed: true,
-      llmModel: 'gemini-3.7-flash',
+      llmModel: 'claude-sonnet-5',
       dataSourcesUsed: ['espn', 'fantasypros', 'weather', 'ai_workflow']
     });
     console.log('✅ Performance tracking recorded');
@@ -129,7 +129,7 @@ export async function executeThursdayOptimization(options: ThursdayOptions): Pro
       dataSourcesUsed: aiResult.summary?.dataSourcesUsed || [
         'ESPN API',
         'AI Workflow',
-        'Gemini 2.0'
+        'Claude'
       ],
       totalCost: 0 // costAnalysis.summary?.dailyCost ||
     },

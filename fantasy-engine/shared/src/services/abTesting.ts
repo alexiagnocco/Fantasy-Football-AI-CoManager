@@ -104,7 +104,7 @@ class ABTestingService {
           name: 'AI Orchestration',
           description: 'LLM-powered multi-factor optimization',
           useLLM: true,
-          llmModel: 'gemini-3.5-flash-lite',
+          llmModel: 'claude-sonnet-5',
           parameters: {
             strategy: 'ai_workflow',
             dataSources: ['espn', 'fantasypros', 'weather', 'news']
@@ -121,17 +121,17 @@ class ABTestingService {
       description: 'Compare different LLM models for cost-effectiveness',
       variants: {
         control: {
-          name: 'GPT-4o-mini',
+          name: 'Claude Haiku 4.5',
           description: 'Cheaper, faster model',
           useLLM: true,
-          llmModel: 'gpt-4o-mini',
+          llmModel: 'claude-haiku-4-5-20251001',
           parameters: {}
         },
         treatment: {
-          name: 'Gemini 3.5 Flash Lite',
-          description: 'Google\'s efficient model',
+          name: 'Claude Sonnet 5',
+          description: 'More capable model',
           useLLM: true,
-          llmModel: 'gemini-3.5-flash-lite',
+          llmModel: 'claude-sonnet-5',
           parameters: {}
         }
       },

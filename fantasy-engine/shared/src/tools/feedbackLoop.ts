@@ -27,7 +27,7 @@ export async function runABTest(args: any) {
           name: 'AI Enhancement',
           description: 'LLM-powered approach',
           useLLM: true,
-          llmModel: 'gemini-3.5-flash-lite',
+          llmModel: 'claude-haiku-4-5-20251001',
           parameters: {}
         }
       },

@@ -1,8 +1,5 @@
 import { LLMProvider, LLMConfig, LLMAnalysisRequest, LLMAnalysisResponse, LLMMessage, LLMTool } from './types.js';
 import { ClaudeProvider } from './providers/claude.js';
-import { OpenAIProvider } from './providers/openai.js';
-import { PerplexityProvider } from './providers/perplexity.js';
-import { GeminiProvider } from './providers/gemini.js';
 import { costMonitor } from '../costMonitor.js';
 
 export class LLMManager {
@@ -23,15 +20,6 @@ export class LLMManager {
       switch (config.provider) {
         case 'claude':
           provider = new ClaudeProvider(config);
-          break;
-        case 'openai':
-          provider = new OpenAIProvider(config);
-          break;
-        case 'perplexity':
-          provider = new PerplexityProvider(config);
-          break;
-        case 'gemini':
-          provider = new GeminiProvider(config);
           break;
         default:
           throw new Error(`Unsupported provider: ${config.provider}`);
@@ -79,15 +67,6 @@ export class LLMManager {
     switch (providerName) {
       case 'claude':
         provider = new ClaudeProvider(tempConfig);
-        break;
-      case 'openai':
-        provider = new OpenAIProvider(tempConfig);
-        break;
-      case 'perplexity':
-        provider = new PerplexityProvider(tempConfig);
-        break;
-      case 'gemini':
-        provider = new GeminiProvider(tempConfig);
         break;
       default:
         return [];

@@ -22,8 +22,8 @@ export interface ProductionConfig {
   
   // LLM Configuration
   llm: {
-    primaryProvider: 'gemini' | 'claude' | 'openai' | 'perplexity';
-    fallbackProvider?: 'gemini' | 'claude' | 'openai' | 'perplexity';
+    primaryProvider: 'claude';
+    fallbackProvider?: 'claude';
     costLimits: {
       perAnalysis: number;
       daily: number;
@@ -73,8 +73,8 @@ export function loadProductionConfig(): ProductionConfig {
     leagues: [],
     
     llm: {
-      primaryProvider: (process.env.PRIMARY_LLM_PROVIDER as any) || 'gemini',
-      fallbackProvider: process.env.FALLBACK_LLM_PROVIDER as any,
+      primaryProvider: 'claude',
+      fallbackProvider: undefined,
       costLimits: {
         perAnalysis: parseFloat(process.env.PER_ANALYSIS_LIMIT || '1.00'),
         daily: parseFloat(process.env.DAILY_COST_LIMIT || '2.00'),
@@ -148,14 +148,12 @@ export function validateProductionConfig(config: ProductionConfig): {
   }
   
   // LLM provider validation
-  const hasLLMKey = 
-    process.env.GEMINI_API_KEY ||
+  const hasLLMKey =
     process.env.CLAUDE_API_KEY ||
-    process.env.OPENAI_API_KEY ||
-    process.env.PERPLEXITY_API_KEY;
-  
+    process.env.ANTHROPIC_API_KEY;
+
   if (!hasLLMKey) {
-    errors.push('At least one LLM API key is required');
+    errors.push('A Claude API key is required (CLAUDE_API_KEY or ANTHROPIC_API_KEY)');
   }
   
   // Warnings for optional features

@@ -4,17 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ESPN Fantasy Football AI Manager — automates team management for ESPN Fantasy Football private leagues using AI-driven decisions. The system runs via GitHub Actions automation or Claude Desktop MCP integration, providing lineup optimization, waiver analysis, and trade recommendations.
+ESPN Fantasy Football AI Manager — automates team management for ESPN Fantasy Football private leagues using AI-driven decisions. Scheduled analysis runs as a Claude cloud routine (daily reports committed to the `reports` branch); interactive use goes through MCP servers for Claude Desktop / Claude Code, providing lineup optimization, waiver analysis, and trade recommendations.
 
 There is **no web frontend**. This is a backend/automation-only repository.
 
 ## Tech Stack
 
-**Automation**: GitHub Actions, TypeScript, Node.js, Commander (CLI)
+**Automation**: Claude Code cloud routine (scheduled daily reports); TypeScript/Node.js Commander CLI in `automation/` for manual runs
 **MCP Server**: Model Context Protocol for Claude Desktop integration
 **Backend API**: Node.js, Express 4, TypeScript, Puppeteer (ESPN auth), node-cache
-**LLM Providers**: Gemini (default), Claude, OpenAI, Perplexity
-**Architecture**: Dual-mode system (GitHub Actions scheduled jobs + Claude Desktop interactive)
+**LLM Provider**: Claude only (`claude-sonnet-5` default via `CLAUDE_MODEL`)
+**Architecture**: Dual-mode system (Claude cloud routine scheduled jobs + Claude Desktop interactive)
 
 ## Project Structure
 
@@ -27,7 +27,7 @@ fantasy-engine/
 │       ├── services/     # espnApi, fantasyProsApi, costMonitor, abTesting, llm/providers
 │       ├── tools/        # aiWorkflowOrchestrator, feedbackLoop
 │       └── types/
-├── automation/       # GitHub Actions CLI — the only module CI builds
+├── automation/       # Analysis CLI (formerly driven by GitHub Actions; now manual-run only)
 │   └── src/commands/     # thursday, sunday, monday, tuesday, phase4, workflow
 ├── mcp-server/       # Claude Desktop MCP integration (see Known Issues)
 │   └── src/tools/        # MCP tools for fantasy operations
@@ -78,15 +78,15 @@ node dist/cli.js <command>
 # Utility:            init | roster | workflow | cost
 ```
 
-## GitHub Actions
+## Scheduled automation (Claude cloud routine)
 
-A single workflow drives everything: `.github/workflows/fantasy-phase4-intelligence.yml`.
+The GitHub Actions workflow was retired (2026-08-29). Scheduled analysis now runs as the **"fantasy-daily-report" Claude Code cloud routine** on a Claude subscription:
 
-- **Schedule is NFL-season-only** (`* 9-12,1` — September through January). Nothing runs Feb–Aug except manual dispatch.
-- Daily analysis 13:00 UTC; game-day monitoring every 4h on Sun/Mon/Thu; waiver analysis Tuesdays 14:00 UTC.
-- `workflow_dispatch` accepts `intelligence_mode` (full/realtime/learning/analytics/seasonal/emergency), `week`, and `force_execution`.
-- **CI builds only `fantasy-engine/automation`.** `server/` and `mcp-server/` are never compiled in CI.
-- The workflow does **not** trigger on `pull_request`, so PRs get no automated checks.
+- **NFL-season-only** cron `0 13 * 9-12,1 *` (13:01 UTC daily, September–January).
+- Each run: preflight env-var check → curl the ESPN API directly → write a ~1-page report (roster health, matchup, start/sit, top-5 waivers with FAAB, urgent item) → commit `reports/<YYYY-MM-DD>.md` to the `reports` branch. Pre-draft/preseason it writes a status note instead.
+- Runs in the DEVKIT cloud environment, which holds `ESPN_S2`, `ESPN_SWID`, `LEAGUE_1_ID`, `LEAGUE_1_TEAM_ID` as env vars and allows outbound HTTPS to `lm-api-reads.fantasy.espn.com` (the other environments block it).
+- Manage/debug at claude.ai → Code → Routines, or via the RemoteTrigger API (`list_runs` / `get_run_log`).
+- **There is no CI.** Nothing builds on push or PR; verify with the local build commands above before pushing.
 
 ## ESPN Integration
 
@@ -107,7 +107,7 @@ Dual strategy against ESPN's DisneyID login:
 1. **Puppeteer automation** (`server/src/services/espnAuth.ts`) — headless Chrome, handles iframe and modal login forms, extracts `espn_s2` and `SWID`, caches the session for 1 hour via node-cache.
 2. **Manual cookie input** (`server/src/services/manualAuth.ts`) — fallback when ESPN changes break automation. Cookies are validated against the ESPN API before being stored.
 
-In GitHub Actions there is no Puppeteer step; cookies come straight from the `ESPN_S2` / `ESPN_SWID` secrets.
+In the cloud routine there is no Puppeteer step; cookies come straight from the cloud environment's `ESPN_S2` / `ESPN_SWID` env vars.
 
 ### Cookie handling
 - `espn_s2`: long auth token (200+ chars)
@@ -137,10 +137,10 @@ POST /api/test/test-cookies | test-public-league | test-endpoint
 
 ## LLM Layer
 
-Providers live in `shared/src/services/llm/providers/` (`base`, `gemini`, `claude`, `openai`, `perplexity`). Add new providers there and extend `BaseLLMProvider`.
+Claude is the only provider (`shared/src/services/llm/providers/`: `base`, `claude`). The Gemini, OpenAI, and Perplexity providers were removed 2026-08-29.
 
-- Default is **Gemini 3.x**; override the model with the `GEMINI_MODEL` env var rather than editing code.
-- Gemini 3.x models think by default and thinking tokens count against `maxOutputTokens`, so `thinkingConfig.thinkingLevel` is pinned to `'low'` and `validateConfig()` uses a 500-token budget. Do not lower it — small budgets return empty content with `finishReason: MAX_TOKENS`.
+- Default model is **`claude-sonnet-5`**; override with the `CLAUDE_MODEL` env var rather than editing code. Key comes from `CLAUDE_API_KEY` or `ANTHROPIC_API_KEY`.
+- Current Claude models reject the `temperature` parameter with a 400, so `ClaudeProvider.chat()` intentionally never sends it.
 - Model pricing tables are hardcoded in `getPricing()` (per 1M tokens) and `enhancedCostMonitor.ts` (per 1K tokens). Both need updating together when rates change.
 
 ## Development Patterns
@@ -165,12 +165,12 @@ Copy `.env.example` and fill in. Required for any real run:
 ESPN_S2=...            # ESPN auth cookie
 ESPN_SWID={...}        # ESPN SWID, braces included
 LEAGUE_1_ID=...        # plus LEAGUE_1_TEAM_ID, LEAGUE_1_NAME
-GEMINI_API_KEY=...     # or CLAUDE_API_KEY / OPENAI_API_KEY / PERPLEXITY_API_KEY
+CLAUDE_API_KEY=...     # or ANTHROPIC_API_KEY (only needed for API-based CLI runs)
 ```
 
-Optional: `LEAGUE_2_*`, `GEMINI_MODEL`, `PRIMARY_LLM_PROVIDER`, `FALLBACK_LLM_PROVIDER`, `FANTASYPROS_SESSION_ID` (or email/password), `DISCORD_WEBHOOK_URL`, `SLACK_WEBHOOK_URL`, `NEWS_API_KEY`, `OPENWEATHER_API_KEY`, `ENABLE_FANTASYPROS` / `ENABLE_NEWS` / `ENABLE_WEATHER`, and the cost limits (`DAILY_COST_LIMIT`, `WEEKLY_COST_LIMIT`, `MONTHLY_COST_LIMIT`, `PER_ANALYSIS_LIMIT`).
+Optional: `LEAGUE_2_*`, `CLAUDE_MODEL`, `FANTASYPROS_SESSION_ID` (or email/password), `DISCORD_WEBHOOK_URL`, `SLACK_WEBHOOK_URL`, `NEWS_API_KEY`, `OPENWEATHER_API_KEY`, `ENABLE_FANTASYPROS` / `ENABLE_NEWS` / `ENABLE_WEATHER`, and the cost limits (`DAILY_COST_LIMIT`, `WEEKLY_COST_LIMIT`, `MONTHLY_COST_LIMIT`, `PER_ANALYSIS_LIMIT`).
 
-For GitHub Actions these are repository **secrets**, except `GEMINI_MODEL` and `PRIMARY_LLM_PROVIDER` which are repository **variables**.
+For the cloud routine, these live as env vars on the DEVKIT cloud environment (claude.ai → Code → environment settings); no API key is needed there.
 
 `PORT` (default 3003) applies to the local server only.
 
@@ -184,11 +184,9 @@ sudo apt-get install -y chromium-browser     # Debian/Ubuntu
 
 ## Known Issues & Limitations
 
-- **`mcp-server/` does not compile.** It has ~40 pre-existing TypeScript errors: its `package.json` is missing `@google/generative-ai`, `openai`, and `@anthropic-ai/sdk`, and several imports reference exports `shared` no longer has. CI does not catch this because it only builds `automation/`.
-- **`shared/` and `mcp-server/` contain duplicated copies** of `gemini.ts`, `enhancedCostMonitor.ts`, `costMonitor.ts`, `abTesting.ts`, `espnApi.ts`, and `feedbackLoop.ts`. Edits must be applied to both or they drift.
-- **`@google/generative-ai` is Google's deprecated SDK**, superseded by `@google/genai`. It currently works, including passing `thinkingConfig` through, but it is the next thing likely to break.
-- **Gemini Flash pricing doubles on 2027-01-01** per Google's published rates; the hardcoded tables will under-report cost by 2x after that date.
-- `.env.example` has drifted from the workflow: it lists `DEFAULT_LLM_PROVIDER` (code uses `PRIMARY_LLM_PROVIDER` / `FALLBACK_LLM_PROVIDER`) and `SLACK_WEBHOOK_URL` but not `DISCORD_WEBHOOK_URL`.
+- **`mcp-server/` does not compile.** It has ~40 pre-existing TypeScript errors: missing deps in its `package.json` and imports referencing exports `shared` no longer has (including the removed Gemini/OpenAI/Perplexity providers). Nothing builds it.
+- **`shared/` and `mcp-server/` contain duplicated copies** of `enhancedCostMonitor.ts`, `costMonitor.ts`, `abTesting.ts`, `espnApi.ts`, and `feedbackLoop.ts` (mcp-server also still carries the removed providers). `mcp-server/` is legacy and was not updated in the Claude-only migration — treat `shared/` as authoritative.
+- ESPN cookies (`espn_s2`/`SWID`) expire roughly monthly; the cloud routine's reports will flag a 401 when they do — refresh them in the DEVKIT environment settings.
 - The local server's CORS origin is still pinned to `http://localhost:5173`, left over from a removed React client. Harmless but vestigial.
 - Single concurrent user session in the local server (last login wins); no database persistence (memory only).
 - ESPN rate limiting is not handled and will surface as 429s.
@@ -198,6 +196,6 @@ sudo apt-get install -y chromium-browser     # Debian/Ubuntu
 1. **Build `shared/` first** — dependents consume its compiled `dist/`
 2. **Mirror edits into `mcp-server/`** while the duplication exists
 3. **Never hardcode a season year** — use `getCurrentNFLSeasonYear()`
-4. **Never hardcode a model name** — use `GEMINI_MODEL` and the provider config
-5. **Verify with `cd fantasy-engine/automation && npm run build`** — that is what CI actually runs
-6. Respect ESPN rate limits; test locally before pushing workflow changes
+4. **Never hardcode a model name** — use `CLAUDE_MODEL` and the provider config
+5. **Verify with `cd fantasy-engine/automation && npm run build`** — there is no CI, so this local check is the only gate
+6. Respect ESPN rate limits; test locally before pushing changes

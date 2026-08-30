@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.60.0",
-    "@google/generative-ai": "^0.24.1",
     "@types/cheerio": "^0.22.35",
     "@types/node": "^22.12.2",
     "axios": "^1.7.9",
@@ -20,7 +19,6 @@
     "dotenv": "^16.4.7",
     "fast-xml-parser": "^5.2.5",
     "node-cache": "^5.1.2",
-    "openai": "^5.16.0",
     "puppeteer": "^24.0.0"
   },
   "devDependencies": {

@@ -39,7 +39,7 @@ export interface LLMResponse {
 }
 
 export interface LLMConfig {
-  provider: 'claude' | 'openai' | 'perplexity' | 'gemini';
+  provider: 'claude';
   model: string;
   api_key: string;
   max_tokens?: number;

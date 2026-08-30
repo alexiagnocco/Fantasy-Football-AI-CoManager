@@ -1,17 +1,18 @@
 # Fantasy Football AI CoManager 🏈🤖
 
-AI-driven management for ESPN Fantasy Football private leagues. The system runs as scheduled GitHub Actions automation and as MCP servers for Claude Desktop / Claude Code — lineup optimization, waiver analysis, trade recommendations, and a live draft agent. Backend/automation only; there is no web frontend (the draft agent ships a small local draft board for in-person drafts).
+AI-driven management for ESPN Fantasy Football private leagues. The system runs as a scheduled Claude cloud routine and as MCP servers for Claude Desktop / Claude Code — daily reports, lineup optimization, waiver analysis, and a live draft agent. Backend/automation only; there is no web frontend (the draft agent ships a small local draft board for in-person drafts).
 
 ## What's in the repo
 
 ```
 fantasy-engine/
-├── shared/           # Core library: ESPN API client, LLM providers, cost monitoring
-├── automation/       # GitHub Actions CLI (the only module CI builds)
+├── shared/           # Core library: ESPN API client, Claude LLM provider, cost monitoring
+├── automation/       # CLI for scheduled/manual analysis runs (legacy GitHub Actions era)
 ├── draft-agent/      # Standalone draft MCP server + offline draft board + league history analysis
 ├── mcp-server/       # Legacy Claude Desktop MCP integration (unmaintained, does not compile)
 └── server/           # Local Express API for ESPN auth (Puppeteer) + manual exploration
 docs/archive/         # Historical docs and scripts, kept for reference only
+reports/ (branch)     # Daily reports committed by the Claude cloud routine
 ```
 
 - **[CLAUDE.md](./CLAUDE.md)** — full developer guide: build commands, architecture, known issues.
@@ -39,19 +40,18 @@ python3 analysis/fetch_history.py      # pulls all seasons (uses .env credential
 python3 analysis/analyze_history.py    # prints the digest, writes analysis/out/analysis.json
 ```
 
-## GitHub Actions automation
+## Scheduled automation (Claude cloud routine)
 
-A single workflow, `.github/workflows/fantasy-phase4-intelligence.yml`, drives everything:
+Daily analysis runs as a **Claude Code cloud routine** ("fantasy-daily-report") on a Claude subscription — no API keys, no GitHub Actions:
 
-- **NFL season only** (September–January). Nothing runs February–August except manual dispatch.
-- Daily analysis at 13:00 UTC; game-day monitoring every 4h on Sun/Mon/Thu; waiver analysis Tuesdays 14:00 UTC.
-- Manual runs via `workflow_dispatch` with `intelligence_mode` (full / realtime / learning / analytics / seasonal / emergency), `week`, and `force_execution`.
-- Results post to Discord via webhook.
+- **NFL season only** (September–January), daily at 13:01 UTC (9:01am ET).
+- Each run checks the ESPN league state, writes a ~1-page report (roster health, matchup outlook, start/sit, waiver targets with FAAB bids), and commits it as `reports/<date>.md` on the `reports` branch.
+- Configuration lives in the routine (claude.ai → Code → Routines) and its cloud environment's env vars: `ESPN_S2`, `ESPN_SWID`, `LEAGUE_1_ID`, `LEAGUE_1_TEAM_ID` (optional `DISCORD_WEBHOOK_URL`).
+- ESPN cookies expire roughly monthly; refresh them in the environment settings when reports flag a 401.
 
-Setup: fork, then add repository **secrets** (`ESPN_S2`, `ESPN_SWID`, `LEAGUE_1_ID`, `LEAGUE_1_TEAM_ID`, `GEMINI_API_KEY`, `DISCORD_WEBHOOK_URL`, …) and optional **variables** (`GEMINI_MODEL`, `PRIMARY_LLM_PROVIDER`). See `.env.example` for the full list.
+The old GitHub Actions workflow (`fantasy-phase4-intelligence.yml`) was retired in favor of this routine. The `automation/` CLI it drove still builds and can be run manually:
 
 ```bash
-# What CI builds — verify changes against this
 cd fantasy-engine/automation && npm ci && npm run build
 node dist/cli.js --help
 ```
@@ -67,9 +67,9 @@ Cookies expire after ~30 days. They go in GitHub secrets (automation), the MCP `
 
 League and team IDs come from your league URL: `…/league?leagueId=XXXX` and `…/team?…&teamId=N`.
 
-## LLM providers
+## LLM
 
-Gemini is the default; Claude, OpenAI, and Perplexity are supported (`shared/src/services/llm/providers/`). Select with `PRIMARY_LLM_PROVIDER` / `FALLBACK_LLM_PROVIDER`; override the Gemini model with `GEMINI_MODEL` — never hardcode model names. Cost limits (`DAILY_COST_LIMIT`, etc.) are enforced by the cost monitor.
+Claude is the only provider (`shared/src/services/llm/providers/claude.ts`). Set `CLAUDE_API_KEY` (or `ANTHROPIC_API_KEY`) for API-based runs of the `automation/` CLI; override the model with `CLAUDE_MODEL` (default `claude-sonnet-5`) — never hardcode model names. Cost limits (`DAILY_COST_LIMIT`, etc.) are enforced by the cost monitor. The scheduled cloud routine needs no API key — it runs on the Claude subscription. Gemini, OpenAI, and Perplexity providers were removed.
 
 ## Known issues
 
