@@ -35,6 +35,9 @@ const server = new McpServer({
   version: "1.0.0",
 });
 
+/** See loadContext: forbids any ESPN live-feed fallback for this instance. */
+const MANUAL_ONLY = (process.env.DRAFT_MODE ?? "").toLowerCase() === "manual";
+
 function resolveLeagueId(arg?: string): string {
   const id = arg || process.env.LEAGUE_ID || process.env.LEAGUE_1_ID;
   if (!id) {
@@ -70,6 +73,14 @@ async function loadContext(leagueIdArg?: string, teamIdArg?: number): Promise<Dr
       );
     }
     return buildManualDraftContext(snapshot, manual);
+  }
+  // DRAFT_MODE=manual pins this server instance to its DRAFT_DATA_DIR: it must
+  // never fall through to the ESPN live feed. This is how a non-ESPN league
+  // (e.g. a Yahoo profile) stays fully isolated from the ESPN league.
+  if (MANUAL_ONLY) {
+    throw new Error(
+      "This draft server runs in manual-only mode (DRAFT_MODE=manual) and no manual session is active. Start the session on the web draft board for this league (npm run web with the same DRAFT_DATA_DIR), then retry."
+    );
   }
   const leagueId = resolveLeagueId(leagueIdArg);
   const teamId = resolveTeamId(teamIdArg);
@@ -306,6 +317,14 @@ Call once before the draft to brief the user; the per-round advice also appears 
         return {
           content: [{ type: "text", text: strategyGuide({ ...snapshot.config, teamCount: manual.teamCount }, manual.totalRounds) }],
         };
+      }
+      // Manual-only instances can still brief the user from the snapshot alone.
+      const idle = MANUAL_ONLY ? loadSnapshot() : null;
+      if (idle) {
+        return { content: [{ type: "text", text: strategyGuide(idle.config, idle.totalRounds) }] };
+      }
+      if (MANUAL_ONLY) {
+        throw new Error("Manual-only mode: no snapshot found in DRAFT_DATA_DIR. Run the profile snapshot first.");
       }
       const leagueId = resolveLeagueId(args.leagueId);
       const { state } = await espnClient.getDraftState(leagueId);

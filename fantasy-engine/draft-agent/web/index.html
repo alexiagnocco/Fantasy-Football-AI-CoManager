@@ -116,7 +116,7 @@
 const $ = (id) => document.getElementById(id);
 let board = null;
 let posFilter = "ALL";
-const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K"];
+const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K", "DST"];
 
 async function api(path, body) {
   const res = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : undefined);
@@ -135,8 +135,11 @@ function render() {
   if (!board) return;
   if (board.error) { $("fatal").innerHTML = `<h1>Not ready</h1><p>${board.error}</p>`; show("fatal"); return; }
   if (board.needsSetup) {
+    // League name + platform come from a manual-mode profile (e.g. Yahoo); ESPN snapshots have neither.
+    const who = board.config.name ? `${board.config.name} (${board.config.platform ?? "espn"}) · ` : "";
+    document.title = board.config.name ? `Draft Board · ${board.config.name}` : "Draft Board";
     $("setup-league").textContent =
-      `${board.config.scoringLabel} · snapshot from ${new Date(board.snapshotCreatedAt).toLocaleString()}`;
+      `${who}${board.config.scoringLabel} · snapshot from ${new Date(board.snapshotCreatedAt).toLocaleString()}`;
     $("su-teams").value = board.config.teamCount || 11;
     $("su-rounds").value = board.totalRounds || 15;
     $("su-slot").max = board.config.teamCount || 20;
@@ -152,7 +155,9 @@ function render() {
     ? `<span class="my-turn">YOU'RE ON THE CLOCK</span>`
     : `On the clock: <b>${s.onTheClockName}</b>`;
   $("h-next").textContent = s.myUpcomingPicks.length ? `Your picks: ${s.myUpcomingPicks.join(", ")}` : "";
-  $("h-league").textContent = `${board.config.scoringLabel} · ${board.config.teamCount} teams`;
+  const leagueName = board.config.name ? `${board.config.name} · ` : "";
+  document.title = board.config.name ? `Draft Board · ${board.config.name}` : "Draft Board";
+  $("h-league").textContent = `${leagueName}${board.config.scoringLabel} · ${board.config.teamCount} teams`;
 
   // tabs
   $("tabs").innerHTML = POSITIONS.map(p =>

@@ -31,7 +31,10 @@ fantasy-engine/
 │   └── src/commands/     # thursday, sunday, monday, tuesday, phase4, workflow
 ├── draft-agent/      # Standalone interactive draft MCP server (no shared/ dependency; compiles clean)
 │   ├── src/              # espnClient, draftMath (snake picks), strategy (VORP/needs/scoring), 4 MCP tools
-│   │                     # plus snapshot.ts (offline bulk load), webServer.ts (local draft board :3210)
+│   │                     # plus snapshot.ts (offline bulk load), webServer.ts (local draft board :3210),
+│   │                     # profile.ts (non-ESPN league profiles: lineup + scoring map, re-scores ESPN's public projections)
+│   ├── profiles/         # yahoo-816469.json — Jake's Agreeable League (Yahoo). Isolated from the ESPN league:
+│   │                     # own data dir (data/yahoo, snapshot committed), port 3211, DRAFT_MODE=manual MCP entry
 │   ├── web/              # single-page manual draft board served by webServer
 │   └── analysis/         # Python league-history toolkit (fetch_history.py, analyze_history.py)
 └── server/           # Local Express API for ESPN auth + manual exploration

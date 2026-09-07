@@ -7,8 +7,11 @@ import {
   PRO_TEAM_BY_ID,
 } from "../constants.js";
 import { DraftState, LeagueConfig, PlayerInfo, DraftPickRecord } from "../types.js";
+import { ScoringMap, scoreStatLine } from "../profile.js";
 
 const PLAYER_POOL_SIZE = 500;
+/** Profile snapshots keep a slightly deeper pool: ADP-ordered, so RB/WR depth thins out fast. */
+const GLOBAL_POOL_SIZE = 600;
 const PLAYER_CACHE_TTL_MS = 5 * 60 * 1000;
 const BYE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -192,45 +195,121 @@ export class EspnClient {
     const pool: PlayerInfo[] = [];
     for (const entry of data.players ?? []) {
       const player = entry.player ?? entry.playerPoolEntry?.player;
-      if (!player?.id) continue;
-      const position = POSITION_BY_ID[player.defaultPositionId as number];
-      if (!position || position === "Unknown") continue;
-
-      // Season projection: statSourceId 1 = projected, statSplitTypeId 0 = full season
-      const stats: Array<Record<string, unknown>> = player.stats ?? [];
-      const proj = stats.find(
-        (s) =>
-          s.statSourceId === 1 &&
-          s.statSplitTypeId === 0 &&
-          s.seasonId === this.year
-      );
-      const projectedPoints = Math.round(((proj?.appliedTotal as number) ?? 0) * 10) / 10;
-
-      const adpRaw = player.ownership?.averageDraftPosition as number | undefined;
-      const adp = adpRaw && adpRaw > 0 ? Math.round(adpRaw * 10) / 10 : 999;
-
-      posRankCounters[position] = (posRankCounters[position] ?? 0) + 1;
-
-      pool.push({
-        id: player.id as number,
-        name: (player.fullName as string) ?? "Unknown",
-        position,
-        proTeam: PRO_TEAM_BY_ID[player.proTeamId as number] ?? "FA",
-        byeWeek: byes[player.proTeamId as number] ?? null,
-        projectedPoints,
-        adp,
-        positionalRank: posRankCounters[position],
-        injuryStatus:
-          player.injuryStatus && player.injuryStatus !== "ACTIVE"
-            ? (player.injuryStatus as string)
-            : null,
-        percentOwned: Math.round((player.ownership?.percentOwned ?? 0) * 10) / 10,
-      });
+      const parsed = this.parsePlayer(player, byes);
+      if (!parsed) continue;
+      // ESPN league mode: projection is ESPN's own total under the league's scoring.
+      parsed.projectedPoints = Math.round(((parsed.rawProjection?.appliedTotal as number) ?? 0) * 10) / 10;
+      posRankCounters[parsed.position] = (posRankCounters[parsed.position] ?? 0) + 1;
+      parsed.positionalRank = posRankCounters[parsed.position];
+      pool.push(stripRaw(parsed));
     }
 
     this.playerCache = { value: pool, expires: Date.now() + PLAYER_CACHE_TTL_MS };
     return pool;
   }
+
+  /**
+   * League-INDEPENDENT player pool for manual-mode profiles (Yahoo etc.).
+   *
+   * Uses ESPN's public, season-wide players feed - no league id, no cookies -
+   * and re-scores every projection from the raw stat line with the supplied
+   * scoring map, so nothing about any ESPN league (its scoring, its roster,
+   * its id) influences the result. ADP and ownership are ESPN-wide market
+   * data. Never cached: snapshot.ts calls this once and persists to disk.
+   */
+  async getGlobalPlayerPool(scoring: ScoringMap, limit = GLOBAL_POOL_SIZE): Promise<PlayerInfo[]> {
+    const byes = await this.getByeWeeks();
+    // The season-wide endpoint ignores most filter fields but a large limit is harmless.
+    const filter = { players: { limit: 5000, sortDraftRanks: { sortPriority: 100, sortAsc: true, value: "PPR" } } };
+    const url = `${ESPN_BASE_URL}/seasons/${this.year}/players?scoringPeriodId=0&view=kona_player_info`;
+    const { data } = await axios.get(url, {
+      headers: { Accept: "application/json", "X-Fantasy-Filter": JSON.stringify(filter) },
+      timeout: 90000,
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+    });
+
+    const entries: unknown[] = Array.isArray(data) ? data : data?.players ?? [];
+    const parsed: ParsedPlayer[] = [];
+    for (const entry of entries) {
+      const e = entry as Record<string, unknown>;
+      const player = (e.player ?? e) as Record<string, unknown>;
+      const p = this.parsePlayer(player, byes);
+      // Keep only players ESPN actually projects this season - the feed
+      // includes thousands of retired/practice-squad names with no line.
+      if (!p || !p.rawProjection) continue;
+      p.projectedPoints = scoreStatLine(
+        (p.rawProjection.stats as Record<string, number>) ?? {},
+        scoring
+      );
+      parsed.push(p);
+    }
+
+    // Draftable pool = best by market rank (ADP), with a projection-based
+    // fallback for players ESPN has not assigned an ADP to.
+    parsed.sort((a, b) => a.adp - b.adp || b.projectedPoints - a.projectedPoints);
+    const pool = parsed.slice(0, limit);
+
+    // Positional rank by THIS profile's projection, since that is what the
+    // board ranks by - ESPN's own draft order is meaningless here.
+    const byPos = new Map<string, ParsedPlayer[]>();
+    for (const p of pool) {
+      if (!byPos.has(p.position)) byPos.set(p.position, []);
+      byPos.get(p.position)!.push(p);
+    }
+    for (const list of byPos.values()) {
+      list.sort((a, b) => b.projectedPoints - a.projectedPoints);
+      list.forEach((p, i) => (p.positionalRank = i + 1));
+    }
+    return pool.map(stripRaw);
+  }
+
+  /** Shared field extraction for both pool endpoints. Null = not a fantasy position. */
+  private parsePlayer(
+    player: Record<string, unknown> | undefined,
+    byes: Record<number, number>
+  ): ParsedPlayer | null {
+    if (!player?.id) return null;
+    const position = POSITION_BY_ID[player.defaultPositionId as number];
+    if (!position || position === "Unknown") return null;
+
+    // Season projection: statSourceId 1 = projected, statSplitTypeId 0 = full season
+    const stats: Array<Record<string, unknown>> = (player.stats as Array<Record<string, unknown>>) ?? [];
+    const proj = stats.find(
+      (s) => s.statSourceId === 1 && s.statSplitTypeId === 0 && s.seasonId === this.year
+    );
+
+    const ownership = player.ownership as Record<string, number> | undefined;
+    const adpRaw = ownership?.averageDraftPosition;
+    const adp = adpRaw && adpRaw > 0 ? Math.round(adpRaw * 10) / 10 : 999;
+
+    return {
+      id: player.id as number,
+      name: (player.fullName as string) ?? "Unknown",
+      position,
+      proTeam: PRO_TEAM_BY_ID[player.proTeamId as number] ?? "FA",
+      byeWeek: byes[player.proTeamId as number] ?? null,
+      projectedPoints: 0,
+      adp,
+      positionalRank: 0,
+      injuryStatus:
+        player.injuryStatus && player.injuryStatus !== "ACTIVE"
+          ? (player.injuryStatus as string)
+          : null,
+      percentOwned: Math.round((ownership?.percentOwned ?? 0) * 10) / 10,
+      rawProjection: proj ?? null,
+    };
+  }
+}
+
+/** PlayerInfo plus the raw ESPN projection entry, used only while parsing. */
+interface ParsedPlayer extends PlayerInfo {
+  rawProjection: Record<string, unknown> | null;
+}
+
+function stripRaw(p: ParsedPlayer): PlayerInfo {
+  const { rawProjection: _raw, ...rest } = p;
+  return rest;
 }
 
 export function describeEspnError(error: unknown): string {

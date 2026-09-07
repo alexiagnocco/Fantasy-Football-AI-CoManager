@@ -8,6 +8,10 @@ export interface LeagueConfig {
   /** Points per reception (1 = full PPR, 0.5 = half, 0 = standard). */
   pointsPerReception: number;
   scoringLabel: string;
+  /** Which site hosts the league. Absent = ESPN (live mode). Set by manual-mode profiles. */
+  platform?: "espn" | "yahoo" | "sleeper" | "other";
+  /** Human-readable league name (manual-mode profiles only). */
+  name?: string;
 }
 
 export interface DraftPickRecord {

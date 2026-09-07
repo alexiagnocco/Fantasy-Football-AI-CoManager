@@ -5,13 +5,33 @@ import { LeagueConfig, PlayerInfo, RankedPlayer, RosterNeeds } from "../types.js
 /* Replacement level + VORP + tiers                                    */
 /* ------------------------------------------------------------------ */
 
+/** Number of multi-position (flex-style) starter slots in the lineup. */
+export function flexSlotCount(config: LeagueConfig): number {
+  return Object.entries(config.starterSlots)
+    .filter(([slot]) => (SLOT_ELIGIBILITY[slot]?.length ?? 0) > 1)
+    .reduce((sum, [, n]) => sum + n, 0);
+}
+
+/** Short scoring descriptor used in strategy text: "full PPR" / "half PPR" / "standard". */
+export function pprLabel(config: LeagueConfig): string {
+  const ppr = config.pointsPerReception;
+  return ppr >= 1 ? "full PPR" : ppr > 0 ? "half PPR" : "standard (non-PPR)";
+}
+
 /**
  * How many players at each position are effectively "startable" league-wide.
  * Direct slots count fully; flex-style slots are apportioned across eligible
- * positions (RB/WR absorb nearly all flex starts in half-PPR leagues).
+ * positions. RB/WR absorb nearly all flex starts; the split tilts toward WR
+ * as reception scoring rises (full PPR) and toward RB in standard scoring.
  */
 export function startableCounts(config: LeagueConfig): Record<string, number> {
-  const flexShare: Record<string, number> = { RB: 0.5, WR: 0.4, TE: 0.1, QB: 0 };
+  const ppr = config.pointsPerReception;
+  const flexShare: Record<string, number> =
+    ppr >= 1
+      ? { RB: 0.4, WR: 0.5, TE: 0.1, QB: 0 }
+      : ppr > 0
+        ? { RB: 0.5, WR: 0.4, TE: 0.1, QB: 0 }
+        : { RB: 0.6, WR: 0.35, TE: 0.05, QB: 0 };
   const counts: Record<string, number> = {};
   for (const [slot, n] of Object.entries(config.starterSlots)) {
     const eligible = SLOT_ELIGIBILITY[slot] ?? [];
@@ -273,10 +293,18 @@ export function roundAdvice(
     return `Last ${roundsLeft} rounds: ${streamOpen.join(" and ")} still open - one pick each, use any spare pick on your best upside stash.`;
   }
   if (round <= 3) {
-    return "Rounds 1-3: lock in elite RB/WR anchors. In half-PPR with only 2 WR slots, workhorse RBs carry extra weight; take the best combination of two RBs and one WR (or 2/2 by round 4) unless a top-3 positional player falls.";
+    const flexes = flexSlotCount(config);
+    const ppr = config.pointsPerReception;
+    if (ppr >= 1 && flexes >= 2) {
+      return `Rounds 1-3: lock in elite RB/WR anchors. In full PPR with ${flexes} flex slots, target-hog WRs and pass-catching RBs are worth the same premium; take the best three of RB/WR on the board (2 WR + 1 RB or 2 RB + 1 WR) unless a top-3 positional player falls.`;
+    }
+    if (ppr >= 1) {
+      return "Rounds 1-3: lock in elite RB/WR anchors. Full PPR lifts high-target WRs to RB1 value; take the best combination of two RBs and one WR (or 2/2 by round 4) unless a top-3 positional player falls.";
+    }
+    return `Rounds 1-3: lock in elite RB/WR anchors. In ${pprLabel(config)} with ${config.starterSlots["WR"] ?? 0} WR slots, workhorse RBs carry extra weight; take the best combination of two RBs and one WR (or 2/2 by round 4) unless a top-3 positional player falls.`;
   }
   if (round <= 6) {
-    return "Rounds 4-6: finish your RB/WR starter core and pounce on a falling elite QB or TE - but don't reach; a dozen startable QBs/TEs exist for 11 teams.";
+    return `Rounds 4-6: finish your RB/WR starter core and pounce on a falling elite QB or TE - but don't reach; a dozen startable QBs/TEs exist for ${config.teamCount} teams.`;
   }
   if (round <= 9) {
     const qbNote = (needs.positionCounts["QB"] ?? 0) === 0 ? " Get your QB in this window before the tier empties." : "";
@@ -295,13 +323,35 @@ export function strategyGuide(config: LeagueConfig, totalRounds: number): string
     .join(", ");
   const hasDst = (config.starterSlots["DST"] ?? 0) > 0;
   const stream = hasDst ? "K and D/ST" : "your kicker";
+  const flexes = flexSlotCount(config);
+  const wrSlots = config.starterSlots["WR"] ?? 0;
+  const ppr = config.pointsPerReception;
+  // 12 teams is the conventional "standard" depth; anything smaller is shallow.
+  const shallow = config.teamCount <= 11;
+
+  // Format-specific bullets: derived from the config so a Yahoo profile and an
+  // ESPN league each get advice for their own shape.
+  const flexNote =
+    flexes >= 2
+      ? `- **${wrSlots} WR + ${flexes} FLEX**: ${wrSlots + flexes} WR-eligible starters means WR depth is a real asset; a strong WR3/WR4 starts every week, and RB/WR bench depth outranks QB/TE insurance.`
+      : `- **Only ${wrSlots} WR + ${flexes} FLEX**: WR depth is less valuable than in 3-WR leagues; elite RBs (scarcer) are the premium asset.`;
+  const pprNote =
+    ppr >= 1
+      ? "- **Full PPR** puts target-volume WRs and pass-catching RBs on equal footing with workhorse RBs; pure TD-dependent players lose value."
+      : ppr > 0
+        ? "- **Half PPR** narrows the RB-vs-WR gap vs full PPR: pass-catching RBs are gold; volume TDs matter more for WRs."
+        : "- **Standard scoring** favours volume rushers and TD scorers; possession receivers lose most of their edge.";
+  const depthNote = shallow
+    ? `- **${config.teamCount} teams is shallow**: the waiver wire stays useful all season, so upside beats safety on the bench, and QB/TE/K replacement level is high - never reach for them.`
+    : `- **${config.teamCount} teams is deep**: replacement level is low everywhere, so secure starters early and value handcuffs.`;
+
   return `# Draft Strategy - ${config.teamCount}-team, ${config.scoringLabel}
 **Lineup**: ${starters} + ${config.benchSlots} bench | **Rounds**: ${totalRounds}
 
 ## Why this league shape changes standard advice
-- **${config.teamCount} teams is shallow**: the waiver wire stays useful all season, so upside beats safety on the bench, and QB/TE/K replacement level is high - never reach for them.
-- **Only 2 WR + 1 FLEX**: WR depth is less valuable than in 3-WR leagues; elite RBs (scarcer, and boosted less by receptions in half-PPR than WRs in full PPR) are the premium asset.
-- **Half PPR** narrows the RB-vs-WR gap vs full PPR: pass-catching RBs are gold; volume TDs matter more for WRs.
+${depthNote}
+${flexNote}
+${pprNote}
 ${hasDst
   ? "- **K and D/ST are pure streaming positions**: one each, in the final rounds only - the projection spread among startable options is tiny."
   : "- **No D/ST slot** means one fewer throwaway pick - that's an extra lottery ticket for your bench."}

@@ -64,6 +64,34 @@ The web UI walks you through setup (teams, rounds, your slot), then you click **
 
 State lives in `data/draft-state.json`, so the MCP server and the web UI stay in sync: while a manual session is active, all four MCP tools automatically use it instead of the ESPN live feed. That means you can click picks in the browser and simultaneously ask Claude Desktop "who should I take and why?" for a deeper discussion. Undo and session reset are in the UI header; a browser or laptop restart loses nothing.
 
+## Non-ESPN leagues (Yahoo): league profiles
+
+Manual mode also covers leagues hosted elsewhere. A **league profile** (`profiles/*.json`) describes the league's lineup, bench, and a scoring map; the snapshot then pulls ESPN's *public, league-independent* projection feed (no league id, no cookies) and re-scores every player with the profile's rules. The result is a board that knows nothing about your ESPN league — different data directory, different port, different MCP server entry, no shared state.
+
+`profiles/yahoo-816469.json` is Jake's Agreeable League (Yahoo): 10 teams, 1 QB / 2 RB / 2 WR / 1 TE / 2 W/R/T / K / DEF + 6 bench = 16 rounds, full PPR, 6-pt passing TDs.
+
+```bash
+npm run snapshot:yahoo   # -> data/yahoo/snapshot.json (already committed; re-run for fresh injury flags)
+npm run web:yahoo        # draft board at http://localhost:3211, state in data/yahoo/draft-state.json
+```
+
+In the Yahoo draft room, click **Drafted** on the board for every pick as it happens (yours included); the Optimal pick panel is scored for the Yahoo format. To also have Claude Desktop in the loop, add a **separate** MCP entry pinned to the Yahoo data directory. `DRAFT_MODE=manual` guarantees it can never fall back to the ESPN live feed:
+
+```json
+"yahoo-draft": {
+  "command": "node",
+  "args": ["/absolute/path/to/fantasy-engine/draft-agent/dist/index.js"],
+  "env": {
+    "DRAFT_MODE": "manual",
+    "DRAFT_DATA_DIR": "/absolute/path/to/fantasy-engine/draft-agent/data/yahoo"
+  }
+}
+```
+
+To profile another league, copy the JSON, edit `starterSlots` (use the agent's slot names: `FLEX` for W/R/T, `DST` for DEF, `OP` for superflex) and the `scoring` map (ESPN stat ids -> points). Offensive ids are verified against live ESPN totals; K and DST ids are best-effort, which is fine for positions drafted in the last two rounds.
+
+Known limits of profile mode: ADP is ESPN's, not Yahoo's, so the "gone by your next pick" estimate reflects ESPN drafters; and player ids are ESPN ids, which only matters if you try to reconcile against a Yahoo export later.
+
 ## Using it during a live online draft
 
 1. Before the draft: *"Give me the strategy guide for my league."*

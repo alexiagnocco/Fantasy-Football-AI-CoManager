@@ -1,0 +1,23 @@
+{
+  "$comment": "Jake's Agreeable League - Yahoo league 816469, 2026 season. Manual-mode profile: the draft board is fed by ESPN's public projections re-scored with THIS league's rules, and never reads any ESPN league settings.",
+  "name": "Jake's Agreeable League",
+  "platform": "yahoo",
+  "leagueId": "816469",
+  "teamCount": 10,
+  "starterSlots": { "QB": 1, "RB": 2, "WR": 2, "TE": 1, "FLEX": 2, "K": 1, "DST": 1 },
+  "benchSlots": 6,
+  "pointsPerReception": 1,
+  "scoringLabel": "Full PPR, 6-pt pass TD",
+  "scoring": {
+    "$comment": "ESPN stat id -> points under Yahoo scoring. Offense ids verified against live ESPN totals; K and DST ids are best-effort (streaming positions, drafted last).",
+    "3": 0.04,  "4": 6,     "19": 2,    "20": -2,
+    "24": 0.1,  "25": 6,    "26": 2,
+    "42": 0.1,  "43": 6,    "44": 2,    "53": 1,
+    "72": -2,   "101": 6,   "102": 6,
+    "74": 5,    "77": 4,    "80": 3,    "86": 1,
+    "99": 1,    "95": 2,    "96": 2,    "97": 2,    "98": 2,
+    "103": 6,   "104": 6,   "105": 6,
+    "89": 10,   "90": 7,    "91": 4,    "92": 1,    "121": 1,
+    "122": 0,   "123": -1,  "124": -4,  "125": -4
+  }
+}
