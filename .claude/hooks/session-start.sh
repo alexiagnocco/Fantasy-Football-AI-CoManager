@@ -4,8 +4,7 @@
 #  - shared:     core library everything depends on (must be built first)
 #  - automation: the only module CI builds
 #  - server:     local Express API (installed so it can be type-checked/edited)
-#  - mcp-server: deps installed for editing only — it has known pre-existing
-#    TypeScript errors and is intentionally NOT built here (see CLAUDE.md)
+# (mcp-server was removed from the repo 2026-08-29 — nothing to install.)
 set -euo pipefail
 
 # Only run in Claude Code on the web (remote) sessions.
@@ -37,9 +36,5 @@ npx tsc
 echo "[session-start] Installing server dependencies..."
 cd "$ENGINE/server"
 npm install --no-audit --no-fund
-
-echo "[session-start] Installing mcp-server dependencies (no build - known TS errors)..."
-cd "$ENGINE/mcp-server"
-npm install --no-audit --no-fund || echo "[session-start] mcp-server install failed (non-fatal)"
 
 echo "[session-start] Done."
