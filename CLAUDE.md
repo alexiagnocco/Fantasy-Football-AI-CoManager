@@ -34,6 +34,8 @@ fantasy-engine/
 │   │                     # plus snapshot.ts (offline bulk load), webServer.ts (local draft board :3210)
 │   ├── web/              # single-page manual draft board served by webServer
 │   └── analysis/         # Python league-history toolkit (fetch_history.py, analyze_history.py)
+├── scripts/
+│   └── matchup-analysis.mjs  # Matchup-adjusted (defense-vs-position) lineup + waiver analysis; no deps, used by the daily routine
 └── server/           # Local Express API for ESPN auth + manual exploration
     └── src/
         ├── routes/       # auth, espn, test
@@ -82,6 +84,7 @@ The GitHub Actions workflow was retired (2026-08-29). Scheduled analysis now run
 
 - **NFL-season-only** cron `0 13 * 9-12,1 *` (13:01 UTC daily, September–January).
 - Each run: preflight env-var check → curl the ESPN API directly → write a ~1-page report (roster health, matchup, start/sit, top-5 waivers with FAAB, urgent item) → commit `reports/<YYYY-MM-DD>.md` to the `reports` branch. Pre-draft/preseason it writes a status note instead.
+- Start/sit and waiver calls are driven by `node fantasy-engine/scripts/matchup-analysis.mjs` (needs the same four env vars): it adjusts each player's scoring for the defenses already faced, applies this week's opponent factor, and blends that with ESPN's projection (matchup weight = games/(games+4), max 70%). Tuning constants sit at the top of the file.
 - Runs in the DEVKIT cloud environment, which holds `ESPN_S2`, `ESPN_SWID`, `LEAGUE_1_ID`, `LEAGUE_1_TEAM_ID` as env vars and allows outbound HTTPS to `lm-api-reads.fantasy.espn.com` (the other environments block it).
 - Manage/debug at claude.ai → Code → Routines, or via the RemoteTrigger API (`list_runs` / `get_run_log`).
 - **There is no CI.** Nothing builds on push or PR; verify with the local build commands above before pushing.
